@@ -1030,6 +1030,18 @@
     "tab-n": function (e) { return groupsTabN(e.key); },
     // r: a group's Reset offsets, the button of its title row.
     "reset-offsets": function () { return groupsResetOffsets(); },
+    // On a subject: d diffs the version on show with the one before; n registers a new version.
+    // On a diff (Sc-06): [ and ] step to the older and newer pair; u flips the layout.
+    "pair-older": function () { var a = document.querySelector("main [data-pair-older]"); if (!a) return false; a.click(); },
+    "pair-newer": function () { var a = document.querySelector("main [data-pair-newer]"); if (!a) return false; a.click(); },
+    unified: function () {
+      var seg = document.querySelector('main .seg[aria-label="Diff layout"]');
+      if (!seg) return false;
+      var off = seg.querySelector("a:not(.on)");
+      if (off) off.click();
+    },
+    diff: function () { var b = document.querySelector("main [data-diff]"); if (!b) return false; b.click(); },
+    "new-version": function () { var b = document.querySelector("main [data-new-version]"); if (!b) return false; b.click(); },
     // Esc closes the panel; with none open it clears the page's own filter.
     close: function (e) {
       if (inspectorIsOpen()) { closeInspector(); e.preventDefault(); return; }
@@ -1468,8 +1480,19 @@
       case "datetime": return date + " " + clock;
       case "datetimems": return date + " " + clock + "." + pad(d.getMilliseconds(), 3);
       case "date": return date;
+      case "day": return dayText(d, new Date());
     }
     return clock;
+  }
+  // A moment by the day it fell on (timefmt.go's dayText): 14:02 today, yesterday
+  // 16:48, 3 days ago, then the date.
+  function dayText(d, now) {
+    var a = new Date(d.getFullYear(), d.getMonth(), d.getDate()), b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var days = Math.round((b - a) / 86400000), hm = pad(d.getHours()) + ":" + pad(d.getMinutes());
+    if (days <= 0) return hm + " today";
+    if (days === 1) return "yesterday " + hm;
+    if (days < 7) return days + " days ago";
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   }
   function spanText(ms) {
     var s = Math.max(0, Math.floor(ms / 1000));
@@ -1962,7 +1985,7 @@ document.addEventListener("click", function (e) {
 
 // Groups: 1 to 4 open the group's tabs by number; r follows its Reset offsets button.
 function groupsTabN(key) {
-  var tabs = Array.prototype.filter.call(document.querySelectorAll("#group-live nav.tabs a.tab"), function (t) { return t.offsetParent !== null; });
+  var tabs = Array.prototype.filter.call(document.querySelectorAll("#group-live nav.tabs a.tab, main nav.tabs[aria-label='Subject tabs'] a.tab"), function (t) { return t.offsetParent !== null; });
   var to = tabs[parseInt(key, 10) - 1];
   if (!to) return false;
   to.click();

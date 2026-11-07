@@ -491,7 +491,8 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		"sub":  func(a, b int) int { return a - b },
 		// when is the one formatter for a moment in time (timefmt.go); whenText is
 		// its plain text, for an attribute.
-		"when": when,
+		"when":    when,
+		"changed": changedHTML,
 		// the declared key map, for the help overlay and for shell.js (keys.go).
 		"keyGroups":       keyGroups,
 		"dialogHints":     dialogHints,
@@ -519,9 +520,11 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		"lower": strings.ToLower,
 		// capital and upper write a word the way a column of the boards does: Topic, Write,
 		// ALLOW. The stored value stays as the broker names it.
-		"capital":  upperFirst,
-		"upper":    strings.ToUpper,
-		"jsonTint": jsonTint,
+		"capital":      upperFirst,
+		"upper":        strings.ToUpper,
+		"jsonTint":     jsonTint,
+		"protoTint":    protoTint,
+		"subjectTopic": subjectTopic,
 		"stateBadge": func(state string) string {
 			switch state {
 			case "Stable":

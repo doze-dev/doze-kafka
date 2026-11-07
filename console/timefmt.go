@@ -27,6 +27,7 @@ const (
 	StyleDate       = "date"       // 2006-01-02
 	StyleAgo        = "ago"        // 3m ago, counted in the browser
 	StyleSince      = "since"      // 3m 10s, counted in the browser
+	StyleDay        = "day"        // 14:02 today, yesterday 16:48, 3 days ago, 2026-10-01
 )
 
 var timeStyles = map[string]string{
@@ -37,6 +38,7 @@ var timeStyles = map[string]string{
 	StyleDate:       "2006-01-02",
 	StyleAgo:        "",
 	StyleSince:      "",
+	StyleDay:        "",
 }
 
 // whenText is the server's own text for a moment: UTC, and it says so. It is the
@@ -52,6 +54,8 @@ func whenText(t time.Time, style string) string {
 		return agoText(time.Since(t))
 	case StyleSince:
 		return spanText(time.Since(t))
+	case StyleDay:
+		return dayText(t, time.Now().UTC()) + " UTC"
 	}
 	layout, ok := timeStyles[style]
 	if !ok {
@@ -70,6 +74,24 @@ func agoText(d time.Duration) string {
 		return fmt.Sprintf("%dh ago", int(d.Hours()))
 	}
 	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+}
+
+// dayText is a moment by the day it fell on, as the Schemas boards write when a
+// version was registered: "14:02 today", "yesterday 16:48", "3 days ago", and the
+// date past a week. t and now are in the same zone.
+func dayText(t, now time.Time) string {
+	y1, m1, d1 := t.Date()
+	y2, m2, d2 := now.Date()
+	days := int(time.Date(y2, m2, d2, 0, 0, 0, 0, time.UTC).Sub(time.Date(y1, m1, d1, 0, 0, 0, 0, time.UTC)).Hours() / 24)
+	switch {
+	case days <= 0:
+		return t.Format("15:04") + " today"
+	case days == 1:
+		return "yesterday " + t.Format("15:04")
+	case days < 7:
+		return fmt.Sprintf("%d days ago", days)
+	}
+	return t.Format("2006-01-02")
 }
 
 // when is the template function: {{when .Time "clockms"}}.

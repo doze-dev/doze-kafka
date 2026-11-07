@@ -108,6 +108,7 @@ func (rc *registryClient) call(ctx context.Context, method, path string, body, o
 		req.Header.Set("X-Doze-Own", "1")
 	}
 	req.Header.Set("Content-Type", "application/vnd.schemaregistry.v1+json")
+	req.Header.Set("User-Agent", consoleAgent)
 	req.Header.Set("Accept", "application/vnd.schemaregistry.v1+json, application/json")
 	if rc.user != "" {
 		req.SetBasicAuth(rc.user, rc.pass)

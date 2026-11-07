@@ -26,6 +26,7 @@
 {{else if eq .InspKind "message"}}{{if .Resend}}{{template "inspector_resend" .}}{{else}}{{template "inspector_message" .}}{{end}}
 {{else if eq .InspKind "member"}}{{template "inspector_member" .}}
 {{else if eq .InspKind "subject"}}{{template "inspector_subject" .}}
+{{else if eq .InspKind "version"}}{{template "inspector_version" .}}
 {{else if eq .InspKind "transaction"}}{{template "inspector_transaction" .}}
 {{else if eq .InspKind "event"}}{{template "inspector_event" .}}
 {{else if eq .InspKind "acl"}}{{template "inspector_acl" .}}
@@ -67,6 +68,28 @@
     <span>Compatibility</span><span class="m">{{.Compat}}{{if not .CompatOwn}} <span class="mut">· the registry's default</span>{{end}}</span>
   </div>
   <div class="inspector-acts"><a class="btn" href="{{.SubjectURL}}">Open the subject <span aria-hidden="true">→</span></a></div>
+</div>
+{{end}}
+
+{{/* Sc-05: one version of a subject. */}}
+{{define "inspector_version"}}
+<div class="inspector-b versionb">
+  <div class="kv" style="--c: 100px 1fr">
+    <span>Schema id</span><span class="m">{{.V.ID}} (global)</span>
+    <span>Type</span><span class="m">{{template "schema_type_pill" .V.Type}}</span>
+    <span>Registered</span><span class="m">{{if .At}}{{when .At "day"}}{{if .By}} by {{.By}}{{end}}{{else}}<span class="mut">not kept</span>{{end}}</span>
+    <span>Referenced by</span><span class="m">{{range $i, $r := .ReferencedBy}}{{if $i}}, {{end}}<a href="{{schemaURL $r.Subject}}?version={{$r.Version}}">{{$r.Subject}} v{{$r.Version}}</a>{{else}}nothing{{end}}</span>
+    <span>Same schema in</span><span class="m">{{range $i, $r := .SameIn}}{{if $i}}, {{end}}<a href="{{schemaURL $r.Subject}}?version={{$r.Version}}">{{$r.Subject}} v{{$r.Version}}</a>{{else}}no other subject{{end}}</span>
+  </div>
+  <div class="callout"><span class="b">On the wire</span>{{range .Wire}}<span class="m">{{.}}</span>{{end}}</div>
+  {{if .Topic}}<div class="col g4"><span class="b">Messages on this id</span>
+    {{if .Use}}<span class="note">{{.Use.Count}} of the newest {{.Scanned}} on {{.Topic}} carry id {{.V.ID}}. Open one to see it decoded.</span>
+    <a class="well row sb ce sc-msg" href="{{.LastURL}}"><span class="m">p{{.Use.Last.Partition}} · {{.Use.Last.Offset}}</span><span class="note">{{when .Use.LastAt "clock"}}</span></a>
+    {{else}}<span class="note">None of the newest {{.Scanned}} records on <a class="m" href="{{.TopicURL}}">{{.Topic}}</a> carry id {{.V.ID}}.</span>{{end}}
+  </div>{{end}}
+  <div class="grow"></div>
+  <div class="row g8">{{if .DiffURL}}<a class="btn" href="{{.DiffURL}}">Diff with v{{.Prev}}</a>{{end}}
+    <a class="btn" href="{{.SubjectURL}}?version={{.V.Version}}&confirm=delete">Delete v{{.V.Version}} ···</a></div>
 </div>
 {{end}}
 

@@ -56,10 +56,12 @@ var keyMap = []keyBinding{
 	{"Enter", "↵", "open", "Open the row on the right", ScopeLists, ""},
 	{"Escape", "esc", "close", "Close the panel, clear the filter", ScopeLists, ""},
 	{"/", "/", "filter", "Filter this table", ScopeLists, ""},
-	{"1", "1", "tab-n", "First tab (on a group)", ScopeLists, ""},
-	{"2", "2", "tab-n", "Second tab (on a group)", ScopeLists, ""},
-	{"3", "3", "tab-n", "Third tab (on a group)", ScopeLists, ""},
-	{"4", "4", "tab-n", "Fourth tab (on a group)", ScopeLists, ""},
+	{"1", "1", "tab-n", "First tab (on a group or a subject)", ScopeLists, ""},
+	{"2", "2", "tab-n", "Second tab (on a group or a subject)", ScopeLists, ""},
+	{"3", "3", "tab-n", "Third tab (on a group or a subject)", ScopeLists, ""},
+	{"4", "4", "tab-n", "Fourth tab (on a group or a subject)", ScopeLists, ""},
+	{"[", "[", "pair-older", "Older pair (on a diff)", ScopeLists, ""},
+	{"]", "]", "pair-newer", "Newer pair (on a diff)", ScopeLists, ""},
 	{"]", "]", "tab-next", "Next tab", ScopeLists, ""},
 	{"[", "[", "tab-prev", "Previous tab", ScopeLists, ""},
 
@@ -69,8 +71,11 @@ var keyMap = []keyBinding{
 	{"c", "c", "create", "Create (on Topics, Subjects, Access); connect an app (on an empty Traffic); copy the bootstrap address (on Cluster)", ScopePage, ""},
 	{"p", "p", "produce", "Produce (on a topic)", ScopePage, ""},
 	{"r", "r", "reset-offsets", "Reset offsets (on a group)", ScopePage, ""},
+	{"d", "d", "diff", "Diff with the previous version (on a subject)", ScopePage, ""},
+	{"n", "n", "new-version", "Register a new version (on a subject)", ScopePage, ""},
 	{"r", "r", "retry", "Retry now, when the broker is lost (on Traffic)", ScopePage, ""},
 	{"e", "e", "errors", "Errors only, and back (on Traffic)", ScopePage, ""},
+	{"u", "u", "unified", "Unified or side by side (on a diff)", ScopePage, ""},
 	{"u", "u", "unfold", "Unfold the open folded row (on Traffic)", ScopePage, ""},
 	{"m", "m", "metrics", "All metrics of the open client (on Traffic)", ScopePage, ""},
 	{"c", "c", "copy", "Copy the decoded fields of the open request (on Traffic)", ScopePage, ""},
@@ -86,7 +91,7 @@ var keyMap = []keyBinding{
 // notInSheet are the actions a page's strip names (Gr-02, Gr-03 draw "1-4 tabs" and
 // "r reset offsets") and Sy-06's sheet does not list: the sheet is the board's three
 // columns, and the board's group strips carry these two.
-var notInSheet = map[string]bool{"tab-n": true, "reset-offsets": true}
+var notInSheet = map[string]bool{"tab-n": true, "reset-offsets": true, "diff": true, "new-version": true, "pair-older": true, "pair-newer": true, "unified": true}
 
 // keymapJSON is the table for shell.js.
 func keymapJSON() template.JS {
@@ -181,7 +186,17 @@ func pageHints(view string) []keyHint {
 	case "schemas":
 		return []keyHint{hintMove, {Keys: []string{"↵"}, Label: "open subject"}, hintFilter, {Keys: []string{"c"}, Label: "register schema"}, hintJump}
 	case "schema":
-		return []keyHint{hintMove, hintClose, {Keys: []string{"g", "s"}, Label: "schemas"}, hintHelp}
+		// Sc-05: an Avro subject's versions.
+		return []keyHint{{Keys: []string{"j", "k"}, Label: "version"}, {Keys: []string{"d"}, Label: "diff with previous"}, {Keys: []string{"n"}, Label: "register new version"}, hintTabs, hintJump}
+	case "schema_proto":
+		// Sc-07.
+		return []keyHint{{Keys: []string{"j", "k"}, Label: "version"}, {Keys: []string{"d"}, Label: "diff with previous"}, {Keys: []string{"n"}, Label: "register new version"}, hintJump}
+	case "schema_diff":
+		// Sc-06.
+		return []keyHint{{Keys: []string{"[", "]"}, Label: "older, newer pair"}, {Keys: []string{"u"}, Label: "unified"}, {Keys: []string{"esc"}, Label: "back to versions"}, hintJump}
+	case "schema_one":
+		// Sc-08 and Sc-18: nothing to diff with.
+		return []keyHint{{Keys: []string{"j", "k"}, Label: "version"}, {Keys: []string{"n"}, Label: "register new version"}, hintJump}
 	case "cluster":
 		// Cl-Home's strip, with j k: ↵ opens the row the cursor is on, and they put it there.
 		return []keyHint{{Keys: []string{"g", "c"}, Label: "cluster"}, hintMove, hintOpen, {Keys: []string{"c"}, Label: "copy bootstrap"}, hintJump}

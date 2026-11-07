@@ -303,13 +303,13 @@ func TestSchemaPageVersionsAndDiff(t *testing.T) {
 	if i2 < 0 || i1 < 0 || i2 > i1 {
 		t.Errorf("v2 should be listed before v1 (%d, %d)", i2, i1)
 	}
-	if !strings.Contains(text, "first version") || !strings.Contains(text, "line") || !strings.Contains(text, "changed from v1") {
+	if !strings.Contains(text, "first version") || !strings.Contains(text, "added optional email") {
 		t.Errorf("what each version changed is not said:\n%s", text)
 	}
-	if strings.Count(text, "changed from v1") != 1 {
-		t.Errorf("v2 only changes from v1: %q", text)
+	if strings.Count(text, "v1, BACKWARD ok") != 1 {
+		t.Errorf("v2 is checked against v1, once: %q", text)
 	}
-	for q, wantOn := range map[string]string{"": "Versions", "?tab=compat": "Compatibility", "?tab=register": "Register", "?tab=bogus": "Versions"} {
+	for q, wantOn := range map[string]string{"": "Versions", "?tab=compat": "Compatibility", "?tab=used": "Used by", "?tab=raw": "Raw", "?tab=bogus": "Versions"} {
 		b := req(t, c, "GET", "/_console/schemas/orders-value"+q, nil).Body.String()
 		on := tabOnRe.FindAllStringSubmatch(between(b, `aria-label="Subject tabs"`, "</nav>"), -1)
 		if len(on) != 1 || on[0][1] != wantOn && !strings.HasPrefix(wantOn, on[0][1]) {
@@ -318,7 +318,7 @@ func TestSchemaPageVersionsAndDiff(t *testing.T) {
 	}
 	// A subject with one version has nothing to compare; an unknown one is not found, with neighbours offered.
 	register(t, c, "payments-value", userV1)
-	if b := readable(req(t, c, "GET", "/_console/schemas/payments-value", nil).Body.String()); !strings.Contains(b, "first version") || strings.Contains(b, "changed from") {
+	if b := readable(req(t, c, "GET", "/_console/schemas/payments-value", nil).Body.String()); !strings.Contains(b, "first version") || strings.Contains(b, "Diff v") {
 		t.Errorf("a single version: %s", b)
 	}
 	rec := req(t, c, "GET", "/_console/schemas/order-value", nil)

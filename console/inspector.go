@@ -33,17 +33,18 @@ const (
 	KindTransaction = "transaction"
 	KindEvent       = "event"
 	KindACL         = "acl"
+	KindVersion     = "version"
 )
 
 // inspectorKinds is every kind the inspector can show, in the order the
 // documentation lists them.
-var inspectorKinds = []string{KindMessage, KindRequest, KindClient, KindMember, KindSubject, KindTransaction, KindEvent, KindACL}
+var inspectorKinds = []string{KindMessage, KindRequest, KindClient, KindMember, KindSubject, KindVersion, KindTransaction, KindEvent, KindACL}
 
 // inspectorKindLabels are the words above a selection's title (Sy-01: "Message",
 // "Request", "Client").
 var inspectorKindLabels = map[string]string{
 	KindMessage: "Message", KindRequest: "Request", KindClient: "Client", KindMember: "Member",
-	KindSubject: "Subject", KindTransaction: "Transaction", KindEvent: "Event", KindACL: "ACL",
+	KindSubject: "Subject", KindTransaction: "Transaction", KindEvent: "Event", KindACL: "ACL", KindVersion: "Version",
 }
 
 // inspectorNav is one of the previous and next controls in the inspector's header.
@@ -163,6 +164,8 @@ func (c *Console) inspectRoute(w http.ResponseWriter, r *http.Request) {
 		c.inspectMember(w, r, key)
 	case KindSubject:
 		c.inspectSubject(w, r, key)
+	case KindVersion:
+		c.inspectVersion(w, r, key)
 	case KindTransaction:
 		c.inspectTransaction(w, r, key)
 	case KindEvent:

@@ -24,7 +24,7 @@ func TestEveryHtmxReferenceFindsItsElement(t *testing.T) {
 	pages := []string{
 		"/_console/topics", "/_console/topics/orders", "/_console/topics/orders?tab=config", "/_console/topics/orders?tab=partitions",
 		"/_console/new/topic", "/_console/groups", "/_console/groups/one-topic?tab=offsets", "/_console/groups/two-topics?tab=offsets",
-		"/_console/schemas", "/_console/schemas/orders-value", "/_console/schemas/orders-value?tab=register", "/_console/new/schema",
+		"/_console/schemas", "/_console/schemas/orders-value", "/_console/schemas/orders-value?tab=raw", "/_console/schemas/orders-value?version=1&open=version:orders-value:1", "/_console/new/schema",
 		"/_console/access", "/_console/new/acl", "/_console/cluster", "/_console/connect", "/_console/trace",
 	}
 	for _, p := range pages {

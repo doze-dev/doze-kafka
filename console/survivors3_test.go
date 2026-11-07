@@ -16,22 +16,26 @@ func TestSchemaSubjectPageSaysWhatIsLatestAndWhatChanged(t *testing.T) {
 	register(t, c, "orders-value", userV2)
 	raw := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String()
 	text := readable(raw)
-	if !strings.Contains(text, "v2 latest") || strings.Contains(text, "v1 latest") || !strings.Contains(text, "8 lines changed from v1") || !strings.Contains(text, "first version") {
+	if !strings.Contains(text, "v2 latest") || strings.Contains(text, "v1 latest") || !strings.Contains(text, "added optional email (null or string, default null)") || !strings.Contains(text, "first version: id") || !strings.Contains(text, "v1, BACKWARD ok") {
 		t.Errorf("versions table:\n%s", between(text, "VersionIdWhat", "Schema v2"))
 	}
 	if !strings.Contains(text, "latest v2, id 2") {
 		t.Error("the latest version and its id are not told")
 	}
 	// Tab addresses: Versions is the subject's own address; the others carry tab=.
-	for _, want := range []string{`href="/_console/schemas/orders-value"`, `href="/_console/schemas/orders-value?tab=compat"`, `href="/_console/schemas/orders-value?tab=register"`} {
+	for _, want := range []string{`href="/_console/schemas/orders-value"`, `href="/_console/schemas/orders-value?tab=compat"`, `href="/_console/schemas/orders-value?tab=used"`, `href="/_console/schemas/orders-value?tab=raw"`} {
 		if !strings.Contains(between(raw, `aria-label="Subject tabs"`, "</nav>"), want) {
 			t.Errorf("no tab link %s", want)
 		}
 	}
-	// The editor for a new version starts from the latest, whichever version is on show.
-	reg := readable(req(t, c, "GET", "/_console/schemas/orders-value?tab=register&version=1", nil).Body.String())
-	if !strings.Contains(reg, "Delete v1") || !strings.Contains(reg, `"email"`) || !strings.Contains(reg, "Schema starts from the latest version") {
-		t.Errorf("register tab on version 1:\n%s", between(reg, "VersionsCompatibilityRegister", "Check compatibility"))
+	// The old Register tab's address goes to the register page for this subject.
+	if rec := req(t, c, "GET", "/_console/schemas/orders-value?tab=register&version=1", nil); rec.Code != 303 || rec.Header().Get("Location") != "/_console/new/schema?subject=orders-value" {
+		t.Errorf("tab=register: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	// The raw tab is the registry's answer for the version on show.
+	raw1 := readable(req(t, c, "GET", "/_console/schemas/orders-value?tab=raw&version=1", nil).Body.String())
+	if !strings.Contains(raw1, "GET /subjects/orders-value/versions/1") || !strings.Contains(raw1, `"version": 1`) || strings.Contains(raw1, "email") {
+		t.Errorf("raw tab:\n%s", between(raw1, "Raw", "The wire"))
 	}
 }
 

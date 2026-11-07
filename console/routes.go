@@ -141,6 +141,8 @@ func (c *Console) routeTable() []routeRow {
 		get("/new/schema", specSchemas, "the register form", c.schemaCreatePage),
 		post("/new/schema", specSchemas, "register a first version", c.schemaCreate),
 		get("/schemas/{subject}", specSchemas, "one subject", c.schemaDetail),
+		get("/schemas/{subject}/diff", specSchemas, "two versions compared", c.schemaDiff),
+		withoutMutating(post("/schemas/{subject}/try", specSchemas, "encode or check a JSON value with a version; sends nothing to the registry", c.schemaTry)),
 		post("/schemas/{subject}/check", specSchemas, "try a version against the level", c.schemaCheck),
 		post("/schemas/{subject}/register", specSchemas, "register a new version", c.schemaRegister),
 		post("/schemas/{subject}/config", specSchemas, "set the compatibility level", c.schemaConfig),

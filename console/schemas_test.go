@@ -95,13 +95,13 @@ func TestSchemaSubjectLifecycle(t *testing.T) {
 	}
 	rec = req(t, c, "GET", "/_console/schemas/orders-value", nil)
 	body = rec.Body.String()
-	for _, want := range []string{"Changes from v1", `class="dl add"`, "email", "v2", "latest"} {
+	for _, want := range []string{"Diff v1 to v2", "added optional", "email", "v2 latest"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("v2 page is missing %q", want)
 		}
 	}
 	rec = req(t, c, "GET", "/_console/schemas/orders-value?version=1", nil)
-	if strings.Contains(rec.Body.String(), "email") {
+	if strings.Contains(between(rec.Body.String(), `class="code schema-text`, "</pre>"), "email") {
 		t.Error("version 1 page shows version 2's field")
 	}
 
