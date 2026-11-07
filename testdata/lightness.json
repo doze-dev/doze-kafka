@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28870178,
+      "binaryBytes": 28870370,
       "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -397,6 +397,20 @@
       "from": 28415122,
       "to": 28870178,
       "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,853,442 and the delete confirm's shared ids of 2026-11-08 (16,736)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28870178,
+      "to": 28870370,
+      "reason": "Schemas: the registry down is its own refusal (registryUnreachable), not the broker's: 192 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28870370,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,870,178 and the registry-down refusal of 2026-11-08 (192)"
     }
   ]
 }
