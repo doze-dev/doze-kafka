@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -396,20 +397,76 @@ type topicSchema struct {
 	TypeLabel           string
 }
 
-func (c *Console) topicSchemas(r *http.Request, topic string) []topicSchema {
+// topicSchemas is the subjects a topic's records are written with: the ones named for
+// it (<topic>-key, <topic>-value), and, when the registry holds subjects named for no
+// topic (RecordNameStrategy, TopicRecordNameStrategy), those whose ids its newest
+// records carry (SCH-26).
+func (c *Console) topicSchemas(r *http.Request, topic string, partitions int32) []topicSchema {
 	if c.reg == nil {
 		return nil
 	}
+	ctx := r.Context()
 	var out []topicSchema
 	for _, part := range []string{"key", "value"} {
 		subject := topic + "-" + part
-		v, err := c.reg.Version(r.Context(), subject, 0)
+		v, err := c.reg.Version(ctx, subject, 0)
 		if err != nil {
 			continue
 		}
 		out = append(out, topicSchema{Label: part, Subject: subject, URL: c.schemaURL(subject), Version: v.Version, TypeLabel: v.TypeLabel()})
 	}
+	if !c.reg.hasRecordNamedSubjects(ctx) {
+		return out
+	}
+	seen := map[string]bool{}
+	for _, s := range out {
+		seen[s.Subject] = true
+	}
+	for _, id := range c.newestSchemaIDs(ctx, topic, partitions) {
+		svs, err := c.reg.IDVersions(ctx, id)
+		if err != nil {
+			continue
+		}
+		for _, sv := range svs {
+			if seen[sv.Subject] || subjectTopic(sv.Subject) != "" {
+				continue // named for a topic: this one's is listed above, another's is not this topic's
+			}
+			seen[sv.Subject] = true
+			if v, err := c.reg.Version(ctx, sv.Subject, 0); err == nil {
+				out = append(out, topicSchema{Label: "record", Subject: sv.Subject, URL: c.schemaURL(sv.Subject), Version: v.Version, TypeLabel: v.TypeLabel()})
+			}
+		}
+	}
 	return out
+}
+
+// newestRecordsForIDs is how many of each partition's newest records topicSchemas reads.
+const newestRecordsForIDs = 20
+
+// newestSchemaIDs is the schema ids in the keys and values of a topic's newest records.
+func (c *Console) newestSchemaIDs(ctx context.Context, topic string, partitions int32) []int {
+	have := map[int]bool{}
+	var ids []int
+	for p := int32(0); p < partitions; p++ {
+		earliest, latest, err := c.be.PartitionOffsets(ctx, topic, p)
+		if err != nil || latest <= earliest {
+			continue
+		}
+		ms, err := c.be.FetchWindow(ctx, topic, p, max(earliest, latest-newestRecordsForIDs), newestRecordsForIDs)
+		if err != nil {
+			continue
+		}
+		for _, m := range ms {
+			for _, b := range [][]byte{m.Key, m.Value} {
+				if id, ok := schemaregistry.WireID(b); ok && !have[id] {
+					have[id] = true
+					ids = append(ids, id)
+				}
+			}
+		}
+	}
+	sort.Ints(ids)
+	return ids
 }
 
 // msgView dresses a record for a table row, reading its key and value through the

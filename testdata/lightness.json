@@ -4,7 +4,7 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28870386,
+      "binaryBytes": 28870418,
       "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
@@ -425,6 +425,20 @@
       "from": 28415122,
       "to": 28870386,
       "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,870,370 and the subject list and register message of 2026-11-08 (16)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28870386,
+      "to": 28870418,
+      "reason": "Schemas: a topic lists the record-named subjects its newest records carry (SCH-26): 32 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28870418,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,870,386 and the record-named subjects on a topic of 2026-11-08 (32)"
     }
   ]
 }

@@ -19,15 +19,15 @@ func TestTopicSchemasComposerAndTags(t *testing.T) {
 	register(t, c, "elsewhere-value", userV1)
 	r := httptest.NewRequest("GET", "/x", nil)
 
-	got := c.topicSchemas(r, "orders")
+	got := c.topicSchemas(r, "orders", 1)
 	if len(got) != 2 || got[0].Label != "key" || got[0].Subject != "orders-key" || got[0].Version != 1 || got[1].Label != "value" || got[1].Version != 2 ||
 		got[1].URL != "/_console/schemas/orders-value" || got[1].TypeLabel != "Avro" {
 		t.Errorf("%+v", got)
 	}
-	if got = c.topicSchemas(r, "plain"); len(got) != 0 {
+	if got = c.topicSchemas(r, "plain", 1); len(got) != 0 {
 		t.Errorf("a topic with no subject: %+v", got)
 	}
-	if got = newTestConsole(t).topicSchemas(r, "orders"); got != nil {
+	if got = newTestConsole(t).topicSchemas(r, "orders", 1); got != nil {
 		t.Errorf("no registry: %+v", got)
 	}
 

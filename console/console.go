@@ -479,6 +479,14 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 			s, _ := settings.Lookup(settings.Topic, key)
 			return s.Unit
 		},
+		"hasRecordSubject": func(ss []topicSchema) bool {
+			for _, s := range ss {
+				if s.Label == "record" {
+					return true
+				}
+			}
+			return false
+		},
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {

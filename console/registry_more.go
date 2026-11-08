@@ -176,6 +176,25 @@ func (rc *registryClient) IDOtherSubjects(ctx context.Context, id int, subject s
 	return out
 }
 
+// hasRecordNamedSubjects is whether the registry holds a live subject named for no
+// topic (not <topic>-key or <topic>-value).
+func (rc *registryClient) hasRecordNamedSubjects(ctx context.Context) bool {
+	if o, ok := rc.Overview(ctx); ok {
+		for _, s := range o.Subjects {
+			if !s.Deleted && subjectTopic(s.Subject) == "" {
+				return true
+			}
+		}
+		return false
+	}
+	for _, s := range rc.SubjectNames(ctx) {
+		if subjectTopic(s) == "" {
+			return true
+		}
+	}
+	return false
+}
+
 // SoftDeleteVersion and SoftDeleteSubject are the first delete: the version or
 // subject is hidden and its ids stay reserved; it can be deleted for good after.
 func (rc *registryClient) SoftDeleteVersion(ctx context.Context, subject string, version int) error {
