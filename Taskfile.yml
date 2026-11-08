@@ -133,6 +133,14 @@ tasks:
       - bunx playwright test -c evidence/playwright.config.ts
       - python3 evidence/optimise.py ../plan/evidence
 
+  site-media:
+    desc: 'The console still and video on doze-dev.com (kafka-orders.webp, kafka-live.webm), from a real broker playing Larder, the example project: its four topics, its four consumer groups and its events. OUT=<dir> moves them (default ../doze-website/public/media). Not part of test:e2e.'
+    dir: e2e
+    cmds:
+      - bun install --frozen-lockfile
+      - bunx playwright install chromium
+      - bun run site-media.ts {{.OUT | default "../../doze-website/public/media"}}
+
   check:identity:
     desc: 'The second identity (listener on :0, a console prefix, a data directory with a space, SASL/SCRAM-SHA-512 and TLS on): the built binary, booted twice over the same directory, used by a real client and the console (TestSecondIdentity; task check runs it with the rest)'
     cmds:
