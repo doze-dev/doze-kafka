@@ -1,5 +1,8 @@
 # doze-kafka
 
+> [!WARNING]
+> **Still in active development.** This project is not cleared for use yet. Expect breaking changes, and do not rely on it for real work.
+
 [![CI](https://github.com/doze-dev/doze-kafka/actions/workflows/ci.yml/badge.svg)](https://github.com/doze-dev/doze-kafka/actions/workflows/ci.yml)
 
 **A JVM-free Kafka for local development — one Go binary, single node, disk-backed.**
