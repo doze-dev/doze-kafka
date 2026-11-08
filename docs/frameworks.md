@@ -79,7 +79,8 @@ their state in a Kafka topic here:
 ## UIs
 
 Both connect and list topics and consumer groups, with no API they need missing, and list
-the [built-in registry](schema-registry.md)'s subjects with their schemas:
+the [built-in registry](schema-registry.md)'s subjects with their schemas, and show an Avro
+value decoded through it:
 
 - **Kafbat UI** (`ghcr.io/kafbat/kafka-ui`): `KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS` at the broker,
   `KAFKA_CLUSTERS_0_SCHEMAREGISTRY` at the registry. It shows the cluster's controller as

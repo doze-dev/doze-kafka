@@ -472,15 +472,15 @@ Section 7, `server` and `cmd`:
 Section 7, client library:
 
 - Unknown id shows 40403 in the drawer: `TestInspectorFramedWithAnUnknownIDSaysSo` (the record is sent through the console's composer, not franz-go).
-- A value cut short shows "mismatch": **missing**.
-- Decode differential over the BACKWARD-compatible corpus pairs: **missing**.
+- A value cut short shows "mismatch": `TestInspectorSaysWhenTheBodyDoesNotFitItsSchema`.
+- Decode differential over the corpus pairs: `TestCompatibleMeansReadable`. For every Avro pair the recording calls BACKWARD compatible, a value written with the old schema reads with the new (hamba's resolution), and for every FORWARD one the reverse: 471 directions read back; 5 pairs with a named type used again are left out, because hamba's `Resolve` does not end on a recursive schema. Run over the incompatible pairs instead, 293 directions fail to read, so the test tells the two apart.
 
 Section 7, compat cells:
 
-- Java and Python `RecordNameStrategy` and `TopicRecordNameStrategy`: done. Python `ProtobufSerializer` with an import: done. READONLY refused with 42205: Python only, not Java. Java unknown id fails with 40403: done.
-- Wrong basic-auth password, `use.latest.version=true`, `normalize.schemas=true`: **missing**.
+- Java and Python `RecordNameStrategy` and `TopicRecordNameStrategy`: done. Python `ProtobufSerializer` with an import: done. READONLY refused with 42205: Java and Python. Java unknown id fails with 40403: done.
+- Wrong basic-auth password (401, under SCRAM/TLS, where the registry asks for one), `use.latest.version=true` with `auto.register.schemas=false` (the latest id, nothing registered), `normalize.schemas=true` (a held schema keeps its id): Java and Python.
 - `kcat -s avro -r`: done (580b1d2; `scripts/install-kcat.sh` builds libserdes).
-- Kafbat UI and Redpanda Console list the subjects and load the latest version: done. Rendering a decoded value: **missing**.
+- Kafbat UI and Redpanda Console list the subjects, load the latest version, and show an Avro record decoded through the registry (written by the Kafka container's console producer: `avro_record` in compat/lib.sh): done, plain and SCRAM/TLS.
 
 Section 7, fuzz:
 
@@ -519,5 +519,5 @@ Section 10, Proof:
 - Mutation: `schemaregistry` checked and re-recorded on 2026-11-08 (1,055 mutants: 781 killed, 102 lived, 31 not covered). Seven survivors were killed by new tests at the limits (`TestLimitsHoldExactlyAtTheLimit`, `TestTheRequestRingHoldsExactlyItsBound`, `TestOverviewIDsAreRuns`, `TestResolvedWithoutReferencesIsNotInlined`, `TestALimitOfZeroIsNoLimit`); the 40 new survivors are in `testdata/mutation.json` with reasons (equivalent ones say why; those in the compatibility engines say no recorded case separates them). The 96 older entries still marked "open" are from before this stage. `console` was not run: it took 8 hours on 2 workers when recorded, and by the owner's decision (2026-10-24) mutation testing is not extended and a piece of work over 1 to 2 hours comes back as a choice. It is left for the owner.
 - Fuzz: `FuzzRegisterReferences`, `FuzzDescriptor`, `FuzzAPIBody` and `FuzzSchemaForms` (the plan's `FuzzSchemaFromForm`) each ran 60 s clean on 2026-11-08; all four are in `task fuzz`.
 - Differential: R1 to R14 recorded and replayed, differences on purpose listed. The count of claims still at `memory` is not yet written in section 8.
-- Compat: see the compat cells above. Java READONLY refusal is in Python only.
+- Compat: every cell the plan names is written and passes plain and SCRAM over TLS (see the compat cells above).
 - Lightness: binary budgets raised with reasons in `testdata/lightness.json` (7842097, 1f1ffed, 21f219d, 70f0ef1 and others); idle heap judged by the median (53ce6db). `task api`: `server` API unchanged (CHANGELOG).

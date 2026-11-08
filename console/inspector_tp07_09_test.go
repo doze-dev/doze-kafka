@@ -106,3 +106,21 @@ func TestInspectorTombstoneNullIsNotEmpty(t *testing.T) {
 		t.Errorf("an empty value is not a delete:\n%s", e)
 	}
 }
+
+// SCH-24: a value framed with a registered id whose body is cut short (here, nothing
+// after the 5 bytes; userV1 needs a long) is named as not fitting the schema, not shown
+// as decoded and not as unframed bytes.
+func TestInspectorSaysWhenTheBodyDoesNotFitItsSchema(t *testing.T) {
+	c, _, _ := newRegistryConsole(t)
+	register(t, c, "orders-value", userV1)
+	req(t, c, "POST", "/_console/new/topic", url.Values{"name": {"orders"}, "partitions": {"1"}})
+	framed := base64.StdEncoding.EncodeToString([]byte("\x00\x00\x00\x00\x01"))
+	sendForm(t, c, "orders", url.Values{"partition": {"0"}, "key": {"k"}, "value": {framed}, "value_enc": {"base64"}})
+	b := readable(message(t, c, "orders", 0))
+	if !strings.Contains(b, "The body does not fit schema 1") || !strings.Contains(b, "its body does not decode with that schema") {
+		t.Errorf("a value cut short is not named as not fitting:\n%s", b)
+	}
+	if strings.Contains(b, "Value, decoded") || strings.Contains(b, "not the registry's 0x00 marker") {
+		t.Errorf("a value cut short is shown as decoded or as unframed:\n%s", b)
+	}
+}

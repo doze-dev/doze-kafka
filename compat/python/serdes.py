@@ -122,3 +122,31 @@ except SchemaRegistryError as e:
     if e.error_code != 42205: fail(f"a new schema in a READONLY subject failed with {e.error_code}, want 42205")
 ok("READONLY: a held schema still serializes; a new one is refused with 42205")
 print("all good")
+
+# use.latest.version with auto.register.schemas off: the latest id, nothing registered.
+t = topic("latest")
+sr.register_schema(f"{t}-value", Schema(avro, "AVRO"))
+latest = sr.register_schema(f"{t}-value", Schema(compatible, "AVRO"))
+before = sr.get_versions(f"{t}-value")
+ser = AvroSerializer(sr, avro, conf={"auto.register.schemas": False, "use.latest.version": True})
+framed = ser({"id": 1, "sku": "x", "note": None}, SerializationContext(t, MessageField.VALUE))
+if framed[0] != 0 or int.from_bytes(framed[1:5], "big") != latest: fail(f"use.latest.version framed id {int.from_bytes(framed[1:5], 'big')}, want {latest}")
+if sr.get_versions(f"{t}-value") != before: fail("use.latest.version registered a version")
+ok("Avro: use.latest.version with auto.register.schemas off writes the latest id and registers nothing")
+
+# normalize.schemas: the same schema with its attributes in another order is the id it has.
+reordered = '{"fields":[{"type":"long","name":"id"},{"type":"string","name":"sku"},{"default":null,"type":["null","string"],"name":"note"}],"name":"Order","type":"record"}'
+ser = AvroSerializer(sr, reordered, conf={"normalize.schemas": True})
+framed = ser({"id": 2, "sku": "y", "note": None}, SerializationContext(t, MessageField.VALUE))
+if int.from_bytes(framed[1:5], "big") != latest or sr.get_versions(f"{t}-value") != before:
+    fail(f"normalize.schemas: the reordered schema got id {int.from_bytes(framed[1:5], 'big')} and versions {sr.get_versions(f'{t}-value')}, want id {latest} and {before}")
+ok("Avro: normalize.schemas registers a reordered schema as the id it has")
+
+# A wrong password is a 401 (the registry asks for one under SASL).
+if "basic.auth.user.info" in reg:
+    wrong = SchemaRegistryClient({**reg, "basic.auth.user.info": os.environ["REGISTRY_USER"] + ":not-the-password"})
+    try:
+        wrong.get_subjects(); fail("a wrong password listed the subjects")
+    except SchemaRegistryError as e:
+        if e.http_status_code != 401: fail(f"a wrong password failed with {e.http_status_code}, want 401")
+    ok("a wrong registry password is refused with 401")

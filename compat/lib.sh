@@ -38,3 +38,30 @@ doc_properties() {
   [ -n "$out" ] || { echo "FAIL docs/frameworks.md has no \`\`\`properties block under \"## $1\"" >&2; return 1; }
   printf '%s\n' "$out"
 }
+
+# avro_record TOPIC registers an Avro schema of one string field ("text") and writes one
+# record framed with its id, the value "greets", through the Kafka container's console
+# producer (a client in Docker reaches the broker by the name it advertises). That
+# producer passes ASCII through as it is but splits on a newline, so an id with a
+# byte of 0x0a or 0x0d, or one past 0x7f, is skipped: the schema is registered again
+# under another name until the id is one it can carry. Prints the id.
+avro_record() {
+  local t=$1 id n=0 b good reg=${REGISTRY_URL/host.docker.internal/127.0.0.1} auth=()
+  [ -z "${REGISTRY_USER:-}" ] || auth=(-u "$REGISTRY_USER:$REGISTRY_PASS")
+  while :; do
+    id=$(curl -fsS ${auth[@]+"${auth[@]}"} -H 'Content-Type: application/vnd.schemaregistry.v1+json' \
+      -d "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Greeting$n\\\",\\\"fields\\\":[{\\\"name\\\":\\\"text\\\",\\\"type\\\":\\\"string\\\"}]}\"}" \
+      "$reg/subjects/$t-g$n-value/versions" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+    [ -n "$id" ] || return 1
+    good=1
+    for b in $((id >> 24 & 255)) $((id >> 16 & 255)) $((id >> 8 & 255)) $((id & 255)); do
+      if [ "$b" -eq 10 ] || [ "$b" -eq 13 ] || [ "$b" -gt 127 ]; then good=0; fi
+    done
+    [ $good = 1 ] && break
+    n=$((n + 1)); [ $n -lt 20 ] || return 1
+  done
+  # Magic byte 0, the id in four bytes, then Avro: "greets" is length 6 (zigzag 0x0c).
+  printf "\\x00\\x$(printf %02x $((id >> 24 & 255)))\\x$(printf %02x $((id >> 16 & 255)))\\x$(printf %02x $((id >> 8 & 255)))\\x$(printf %02x $((id & 255)))\\x0cgreets\n" |
+    kafka_tool kafka-console-producer.sh --topic "$t" >/dev/null 2>&1 || return 1
+  echo "$id"
+}

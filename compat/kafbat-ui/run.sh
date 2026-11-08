@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Kafbat UI (the maintained fork of Kafka UI): it connects, and lists the cluster's topics and
 # consumer groups without tripping on an API the broker does not have, and lists the
-# built-in registry's subjects.
+# built-in registry's subjects and shows an Avro record decoded through it.
 set -euo pipefail
 . ../lib.sh
 need_docker; trap_cleanup
@@ -17,6 +17,7 @@ curl -fsS ${REG_AUTH[@]+"${REG_AUTH[@]}"} -H 'Content-Type: application/vnd.sche
   -d '{"schema":"{\"type\":\"record\",\"name\":\"Greeting\",\"fields\":[{\"name\":\"text\",\"type\":\"string\"}]}"}' \
   "$HOST_REG/subjects/$T-value/versions" >/dev/null || fail "registering a schema"
 
+AVRO_ID=$(avro_record "$T-avro") || fail "writing an Avro record"
 CONTAINER=compat-kafbat-$$
 ENVS=(-e KAFKA_CLUSTERS_0_NAME=local -e "KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=$BOOTSTRAP" -e DYNAMIC_CONFIG_ENABLED=false
       -e "KAFKA_CLUSTERS_0_SCHEMAREGISTRY=$REGISTRY_URL")
@@ -47,3 +48,8 @@ ok "the broker list and a topic's detail load"
 curl -fsS "$URL/api/clusters/local/schemas" | grep -q "\"subject\":\"$T-value\"" || fail "the schema list lacks $T-value: $(curl -sS "$URL/api/clusters/local/schemas" | head -c 400)"
 curl -fsS "$URL/api/clusters/local/schemas/$T-value/latest" | grep -q 'Greeting' || fail "the subject's latest schema did not load: $(curl -sS "$URL/api/clusters/local/schemas/$T-value/latest" | head -c 400)"
 ok "the schema list shows the registry's subject, and its latest version loads"
+# The Avro record, read through the registry: the value the UI shows is the JSON it means.
+MSGS="$URL/api/clusters/local/topics/$T-avro/messages/v2?mode=EARLIEST&limit=5&valueSerde=SchemaRegistry"
+for _ in $(seq 1 15); do curl -fsS --max-time 20 "$MSGS" 2>/dev/null | grep -qF '{\"text\":\"greets\"}' && break; sleep 1; done
+curl -fsS --max-time 20 "$MSGS" | grep -qF '{\"text\":\"greets\"}' || fail "the UI did not decode the Avro record (id $AVRO_ID): $(curl -sS --max-time 20 "$MSGS" | grep MESSAGE | head -c 400)"
+ok "the topic's Avro record is shown decoded through the registry (id $AVRO_ID)"

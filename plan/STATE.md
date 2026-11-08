@@ -15,9 +15,8 @@ All seven P1 findings are closed: SCH-1, 2, 3, 4, 5, 6, 7. Rows 1 to 5 of sectio
 All 19 boards (Sc-Home, Sc-01 to Sc-18) are built; 17 are held by the design gate (`e2e/design/schemas`, 19 tests), Sc-10 and Sc-13 by console tests with their deviations in plan/00-foundation.md. `e2e/tests/schemas.spec.ts` has 21 tests. Every finding is closed; plan/stages/schemas.md section 12 gives the status of each with the test that holds it. Overnight on 2026-11-08: the delete confirms checked against a real registry (they miscounted soft-deleted versions and called a shared id lost; fixed), the registry-down page (it said "Can't reach the broker"; fixed), SIGKILL and registry-off `cmd` tests, the registry under the second identity, kcat Avro decode and the two UIs listing subjects in the compat matrix (with a libserdes patch for GitHub's Ubuntu 26.04 runner), the register message (SCH-33), the subject list without schema text (SCH-8), coverage floors at the targets (schemaregistry 92, console 90), and the schemaregistry mutation baseline re-recorded with reasons.
 
 ### Left in Stage 5, for the owner
-2. Console mutation run: about 8 hours on 2 workers; not started, by the 2026-10-24 decision (work over 1 to 2 hours comes back as a choice).
-3. Compat cells not written: a wrong basic-auth password, `use.latest.version`, `normalize.schemas`, a Java READONLY refusal (Python has one), the UIs rendering a decoded value; and the decode differential over the corpus pairs.
-4. Review and merge PR #4 (the owner merges it).
+1. Console mutation run: recording (started 2026-11-08, 4 workers); survivors get reasons when it ends.
+2. Review and merge PR #4 (the owner merges it).
 
 ### For the owner to decide
 - Decided 2026-11-08 (owner): the idle-heap gate judges the median of the starts, not the largest. Before that, on CI (linux/arm64) the median was steady across Stage 5 (1,370,872 to 1,373,640) while the largest went from 1,374,136 to 1,384,824 and failed the gate once (commit 7842097) with nothing grown. Budgets recorded before then are the largest of 20 starts and come down to the median when next recorded.

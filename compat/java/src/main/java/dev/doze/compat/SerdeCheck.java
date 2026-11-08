@@ -170,6 +170,69 @@ final class SerdeCheck {
     }
     ok("an unknown schema id: the Avro deserializer fails with 40403");
 
+    // ---- use.latest.version: with auto.register.schemas off, the serializer writes the
+    // subject's latest id (v2 here) and registers nothing.
+    String avroSubject = avro + "-value";
+    int latestId = sr.getLatestSchemaMetadata(avroSubject).getId();
+    int versionsBefore = sr.getAllVersions(avroSubject).size();
+    try (KafkaProducer<String, Object> p = producer(KafkaAvroSerializer.class, "auto.register.schemas", false, "use.latest.version", true)) {
+      GenericRecord r = new GenericData.Record(v2);
+      r.put("id", 11L); r.put("sku", "latest"); r.put("note", null);
+      p.send(new ProducerRecord<>(avro, "latest", r)).get(10, TimeUnit.SECONDS);
+    }
+    Properties rawRead = Check.with("group.id", "raw-" + System.nanoTime(), "auto.offset.reset", "earliest",
+        "key.deserializer", StringDeserializer.class.getName(), "value.deserializer", org.apache.kafka.common.serialization.ByteArrayDeserializer.class.getName());
+    try (KafkaConsumer<String, byte[]> c = new KafkaConsumer<>(rawRead)) {
+      byte[] last = read(c, avro, 5).stream().filter(x -> "latest".equals(x.key())).findFirst().map(ConsumerRecord::value).orElse(null);
+      check(last != null && last.length > 5 && last[0] == 0 && java.nio.ByteBuffer.wrap(last, 1, 4).getInt() == latestId,
+          "use.latest.version: the record is not framed with the latest id " + latestId);
+    }
+    check(sr.getAllVersions(avroSubject).size() == versionsBefore, "use.latest.version: a version was registered");
+    ok("Avro: use.latest.version with auto.register.schemas off writes the latest id and registers nothing");
+
+    // ---- normalize.schemas: the registry takes ?normalize=true; the same schema is the same id
+    try (KafkaProducer<String, Object> p = producer(KafkaAvroSerializer.class, "normalize.schemas", true)) {
+      GenericRecord r = new GenericData.Record(v2);
+      r.put("id", 12L); r.put("sku", "normalized"); r.put("note", "n");
+      p.send(new ProducerRecord<>(avro, "normalized", r)).get(10, TimeUnit.SECONDS);
+    }
+    check(sr.getAllVersions(avroSubject).size() == versionsBefore && sr.getLatestSchemaMetadata(avroSubject).getId() == latestId,
+        "normalize.schemas: the schema the subject holds was registered again as a new version or id");
+    ok("Avro: normalize.schemas registers a held schema as the id it has");
+
+    // ---- READONLY: a new version is refused with 42205 (SCH-14); the held one still serializes
+    String ro = "ro-" + tag;
+    try (Admin a = Admin.create(Check.base())) { a.createTopics(List.of(new NewTopic(ro, 1, (short) 1))).all().get(20, TimeUnit.SECONDS); }
+    try (KafkaProducer<String, Object> p = producer(KafkaAvroSerializer.class)) {
+      GenericRecord r = new GenericData.Record(v1);
+      r.put("id", 1L); r.put("sku", "ro");
+      p.send(new ProducerRecord<>(ro, "k", r)).get(10, TimeUnit.SECONDS);
+    }
+    sr.setMode("READONLY", ro + "-value");
+    try (KafkaProducer<String, Object> p = producer(KafkaAvroSerializer.class)) {
+      GenericRecord held = new GenericData.Record(v1);
+      held.put("id", 2L); held.put("sku", "held");
+      p.send(new ProducerRecord<>(ro, "k", held)).get(10, TimeUnit.SECONDS);
+      GenericRecord r = new GenericData.Record(v2);
+      r.put("id", 3L); r.put("sku", "new"); r.put("note", null);
+      try { p.send(new ProducerRecord<>(ro, "k", r)).get(10, TimeUnit.SECONDS); check(false, "READONLY: a new version was registered"); }
+      catch (Exception e) {
+        RestClientException rce = restCause(e);
+        check(rce != null && rce.getErrorCode() == 42205, "READONLY: a new version failed with " + e + ", want 42205");
+      }
+    }
+    ok("READONLY: a held schema still serializes; a new version is refused with 42205");
+
+    // ---- a wrong password is the client's 401 (the registry asks for one under SASL)
+    if ("scram-tls".equals(System.getenv("SECURITY"))) {
+      Map<String, Object> wrong = new HashMap<>(registry());
+      wrong.put("basic.auth.user.info", System.getenv("REGISTRY_USER") + ":not-the-password");
+      SchemaRegistryClient wrongClient = new CachedSchemaRegistryClient(System.getenv("REGISTRY_URL"), 10, wrong);
+      try { wrongClient.getAllSubjects(); check(false, "a wrong password listed the subjects"); }
+      catch (RestClientException e) { check(e.getStatus() == 401, "a wrong password failed with " + e.getStatus() + ", want 401"); }
+      ok("a wrong registry password is refused with 401");
+    }
+
     // ---- Protobuf: a DynamicMessage from a schema, round trip
     ProtobufSchema ps = new ProtobufSchema("syntax = \"proto3\";\nmessage Event { string name = 1; int64 at = 2; repeated string tags = 3; }\n");
     try (KafkaProducer<String, Object> p = producer(KafkaProtobufSerializer.class)) {

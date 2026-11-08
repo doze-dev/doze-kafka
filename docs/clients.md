@@ -43,7 +43,9 @@ over SASL/SCRAM-SHA-512 and TLS**. The versions are the ones the cells pin (`com
 | **KafkaJS** | 2.2.4 | admin, idempotent producer, group consume and commit |
 
 Confluent's Java Avro, Protobuf and JSON Schema serializers (8.3.2) and confluent-kafka's Avro,
-Protobuf and JSON Schema serializers also run, against the [built-in registry](schema-registry.md).
+Protobuf and JSON Schema serializers also run, against the [built-in registry](schema-registry.md):
+round trips, both record naming strategies, a READONLY subject's 42205, `use.latest.version`,
+`normalize.schemas` and a wrong password's 401.
 See [Frameworks and tools](frameworks.md) for Streams, Spring, Connect, schema registries
 and the UIs.
 
