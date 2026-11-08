@@ -5,7 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"net"
 	"net/http"
+	"net/url"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -31,7 +36,15 @@ func (c *Console) registryOff(w http.ResponseWriter, r *http.Request) bool {
 		c.fail(w, r, fmt.Errorf("%w: no schema registry is connected to this console", errNotFound))
 		return true
 	}
-	c.render(w, r, "schemas_off", map[string]any{"Page": "schemas", "Title": "Schemas"})
+	dir := c.facts.DataDir
+	if dir == "" {
+		dir = "./data"
+	}
+	if strings.ContainsAny(dir, " '\"") {
+		dir = "'" + strings.ReplaceAll(dir, "'", `'\''`) + "'"
+	}
+	c.render(w, r, "schemas_off", map[string]any{"Page": "schemas", "View": "schemas_off", "Title": "Schemas", "Reason": c.regOff,
+		"DataDir": dir, "TurnOn": "doze-kafka --data-dir " + dir + " --schema-registry", "Example": registryExample(c.be.displayAddr())})
 	return true
 }
 
@@ -42,6 +55,9 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	list, ids, err := c.reg.Catalogue(ctx)
 	if err != nil {
+		if c.registryDenied(w, r, err) {
+			return
+		}
 		c.fail(w, r, err)
 		return
 	}
@@ -78,10 +94,68 @@ func (c *Console) schemas(w http.ResponseWriter, r *http.Request) {
 	}
 	host := strings.TrimPrefix(strings.TrimPrefix(regURL, "http://"), "https://")
 	mode, _ := c.reg.Mode(ctx)
-	c.render(w, r, "schemas_home", map[string]any{"List": list, "Rows": rows, "Page": "schemas", "Title": "Schemas",
+	data := map[string]any{"List": list, "Rows": rows, "Page": "schemas", "Title": "Schemas",
 		"VersionCount": versions, "GlobalLevel": global, "RegistryURL": regURL, "RegistryHost": host, "Mode": mode,
-		"BuiltIn": c.facts.RegistryBuiltIn, "IDs": idSummary(ids),
-		"SASL": len(c.facts.SASLMechanisms) > 0 || c.be.opts.SASLUser != ""})
+		"BuiltIn": c.facts.RegistryBuiltIn, "IDs": idSummary(ids), "Bootstrap": c.be.displayAddr(),
+		"SASL": len(c.facts.SASLMechanisms) > 0 || c.be.opts.SASLUser != ""}
+	if len(rows) == 0 {
+		data["View"] = "schemas_none"
+		data["ProducerProps"], data["SampleTopic"] = c.producerProps(r), "<topic>"
+		if tps, err := c.be.ListTopics(ctx); err == nil {
+			for _, t := range tps {
+				if !strings.HasPrefix(t.Name, "__") {
+					data["SampleTopic"] = t.Name
+					break
+				}
+			}
+		}
+	}
+	// Subjects a client soft-deleted (SCH-17): no longer listed or looked up, their text
+	// still held until they are deleted for good.
+	if deleted, err := c.reg.DeletedSubjects(ctx); err == nil && len(deleted) > 0 {
+		type gone struct {
+			Name    string
+			Confirm confirmView
+		}
+		var rows []gone
+		for _, d := range deleted {
+			f := confirmFacts{Name: d, SoftDeleted: true}
+			if vs, err := c.reg.AllVersions(ctx, d); err == nil {
+				f.Versions = len(vs)
+			}
+			rows = append(rows, gone{Name: d, Confirm: viewOf("schema.delete", f)})
+		}
+		data["Deleted"] = rows
+	}
+	maps.Copy(data, c.dockData(DockFilter{Registry: true}))
+	c.render(w, r, "schemas_home", data)
+}
+
+// propLine is one line of a properties file: a key and its value, or a comment.
+type propLine struct {
+	Key, Value string
+	Comment    bool
+}
+
+// producerProps is Sc-01's producer.properties: this broker's client settings (the
+// Connect page's, so the login is the same), the registry's address, and the value
+// serializer, with the default it relies on said.
+func (c *Console) producerProps(r *http.Request) []propLine {
+	f := c.connectFacts(r)
+	out := []propLine{{Key: "# producer.properties", Comment: true}}
+	for _, p := range f.Properties {
+		if strings.HasPrefix(p, "#") {
+			out = append(out, propLine{Key: p, Comment: true})
+			continue
+		}
+		k, v, _ := strings.Cut(p, "=")
+		out = append(out, propLine{Key: k, Value: v})
+		if k == "bootstrap.servers" && f.Registry != "" {
+			out = append(out, propLine{Key: "schema.registry.url", Value: f.Registry})
+		}
+	}
+	return append(out, propLine{Key: "value.serializer", Value: "io.confluent.kafka.serializers.KafkaAvroSerializer"},
+		propLine{Key: "# auto.register.schemas=true is the default", Comment: true})
 }
 
 // idSpan is Sc-Home's list foot: how many schemas, the ids they span, and the ids in
@@ -114,38 +188,9 @@ func idSummary(ids []int) idSpan {
 	return s
 }
 
-func (c *Console) schemaCreatePage(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	list, _ := c.reg.Subjects(r.Context())
-	subject := r.URL.Query().Get("subject")
-	c.render(w, r, "schema_create", map[string]any{"List": list, "Page": "schemas", "Title": "Register schema", "Subject": subject,
-		"Types": []string{schemaregistry.TypeAvro, schemaregistry.TypeJSON, schemaregistry.TypeProtobuf}})
-}
-
-func (c *Console) schemaCreate(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	subject := strings.TrimSpace(r.FormValue("subject"))
-	if subject == "" {
-		c.fail(w, r, badInput("give the subject a name, such as orders-value"))
-		return
-	}
-	body, err := schemaFromForm(r)
-	if err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	if _, err := c.reg.Register(r.Context(), subject, body); err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	c.redirect(w, r, c.schemaURL(subject), "Schema registered")
-}
-
 // schemaFromForm reads a schema text, its type and any references from a form.
+//
+//fuzz:parser class=console-forms FuzzSchemaForms
 func schemaFromForm(r *http.Request) (schemaBody, error) {
 	text := strings.TrimSpace(r.FormValue("schema"))
 	if text == "" {
@@ -167,220 +212,146 @@ func schemaFromForm(r *http.Request) (schemaBody, error) {
 	return b, nil
 }
 
-func (c *Console) schemaDetail(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
+// registryDenied draws Sc-13 for a page the registry refused the console (401): the
+// registry's refusal, the user the console signs in as, and how a client and a
+// person by hand give it theirs. The sign-in form the board draws is cut (SCH-19):
+// the console has one user, the broker's, and asks for no other.
+func (c *Console) registryDenied(w http.ResponseWriter, r *http.Request, err error) bool {
+	var re *regError
+	if !errors.As(err, &re) || re.Status != http.StatusUnauthorized || !wantsPage(r) {
+		return false
 	}
-	ctx := r.Context()
-	subject := groupFromSegment(r.PathValue("subject"))
-	versions, err := c.reg.Versions(ctx, subject)
-	if err != nil {
-		c.failSubject(w, r, err, subject)
-		return
+	regURL := c.facts.RegistryURL
+	if regURL == "" {
+		regURL = c.reg.base
 	}
-	want := 0
-	if n, err := strconv.Atoi(r.URL.Query().Get("version")); err == nil {
-		want = n
+	raw, _ := json.Marshal(map[string]any{"error_code": 401, "message": re.Message})
+	user := c.reg.user
+	data := map[string]any{"Page": "schemas", "View": "schemas_denied", "Title": "Schemas", "RegistryURL": regURL,
+		"RegistryHost": strings.TrimPrefix(strings.TrimPrefix(regURL, "http://"), "https://"), "Raw": string(raw), "User": user,
+		"SASL": len(c.facts.SASLMechanisms) > 0 || user != "", "AppUser": "<user>"}
+	if user != "" {
+		data["AppUser"] = user
 	}
-	cur, err := c.reg.Version(ctx, subject, want)
-	if err != nil {
-		c.failSubject(w, r, err, subject)
-		return
-	}
-	list, _ := c.reg.Subjects(ctx)
-	level, own, _ := c.reg.Compat(ctx, subject)
-
-	tab := r.URL.Query().Get("tab")
-	if tab != "compat" && tab != "register" {
-		tab = "versions"
-	}
-	tabURL := func(key string) string {
-		if key == "versions" {
-			return c.schemaURL(subject)
-		}
-		return c.schemaURL(subject) + "?tab=" + key
-	}
-	latestV := versions[len(versions)-1]
-	data := map[string]any{
-		"List": list, "Sel": subject, "Subject": subject, "Page": "schemas", "View": "schema", "Title": subject,
-		"Versions": versions, "Cur": cur, "Text": cur.Pretty(), "Latest": latestV,
-		"Compat": level, "CompatOwn": own, "Levels": compatLevels(),
-		"IsLatest": cur.Version == latestV, "Tab": tab,
-		"Tabs": []tabLink{
-			{Key: "versions", Label: "Versions", URL: tabURL("versions"), On: tab == "versions"},
-			{Key: "compat", Label: "Compatibility", URL: tabURL("compat"), On: tab == "compat"},
-			{Key: "register", Label: "Register", URL: tabURL("register"), On: tab == "register"},
-		},
-	}
-	// The versions table: each version, its id and what it changed from the one before.
-	if tab == "versions" {
-		type vrow struct {
-			Version, ID int
-			Latest      bool
-			Changed     string
-		}
-		var vrows []vrow
-		var prevText string
-		for i, v := range versions {
-			sv, err := c.reg.Version(ctx, subject, v)
-			if err != nil {
-				continue
-			}
-			vr := vrow{Version: v, ID: sv.ID, Latest: v == latestV}
-			if i == 0 {
-				vr.Changed = "first version"
-			} else {
-				changed := 0
-				for _, l := range diffLines(prevText, sv.Pretty()) {
-					if l.Op != "same" {
-						changed++
-					}
-				}
-				if changed == 0 {
-					vr.Changed = "no change to the text"
-				} else {
-					vr.Changed = fmt.Sprintf("%d line%s changed from v%d", changed, plural(changed), versions[i-1])
-				}
-			}
-			prevText = sv.Pretty()
-			vrows = append(vrows, vr)
-		}
-		// Newest first, as the board lists them.
-		for i, j := 0, len(vrows)-1; i < j; i, j = i+1, j-1 {
-			vrows[i], vrows[j] = vrows[j], vrows[i]
-		}
-		data["VersionRows"] = vrows
-	}
-	if lv, err := c.reg.Version(ctx, subject, 0); err == nil {
-		data["LatestID"] = lv.ID
-	}
-	// The editor for a new version starts from the latest, whichever is on show.
-	if latest, err := c.reg.Version(ctx, subject, 0); err == nil {
-		data["LatestText"] = latest.Pretty()
-	} else {
-		data["LatestText"] = cur.Pretty()
-	}
-	// What changed from the version before this one.
-	for i, v := range versions {
-		if v == cur.Version && i > 0 {
-			if prev, err := c.reg.Version(ctx, subject, versions[i-1]); err == nil {
-				data["Prev"] = prev
-				data["Diff"] = diffLines(prev.Pretty(), cur.Pretty())
-				changed := 0
-				for _, l := range diffLines(prev.Pretty(), cur.Pretty()) {
-					if l.Op != "same" {
-						changed++
-					}
-				}
-				data["Changed"] = changed
-			}
-		}
-	}
-	data["Confirm"] = subjectConfirms(subject, versions, cur.Version)
-	// The topic this subject is named for, when there is one.
-	if topics, err := c.be.ListTopics(ctx); err == nil {
-		var names []string
-		for _, t := range topics {
-			names = append(names, t.Name)
-		}
-		g := NewGraph()
-		g.AddSubjects([]string{subject}, names)
-		data["Neighbours"] = c.neighbourClauses(g, NodeSubject, subject)
-	}
-	c.render(w, r, "schema_detail", data)
+	maps.Copy(data, c.dockData(DockFilter{Registry: true}))
+	w.Header().Set("X-Doze-Page", "error")
+	c.shellData(r, data)
+	c.execute(w, http.StatusUnauthorized, "schemas_denied", data, true)
+	return true
 }
 
-// failSubject is failResource for a subject, which is in the Schemas section.
+// registryExample is where the registry would listen by default: port 8081 on the
+// broker's own host.
+func registryExample(broker string) string {
+	host, _, err := net.SplitHostPort(broker)
+	if err != nil || host == "" {
+		return "host:8081"
+	}
+	return net.JoinHostPort(host, "8081")
+}
+
+// failSubject is failResource for a subject: a page asked for a subject the
+// registry does not have gets Sc-16, the registry's refusal and the subjects it
+// does have that are close to the name, whether it was soft-deleted, and a way to
+// register it; anything else is the foundation's refusal.
 func (c *Console) failSubject(w http.ResponseWriter, r *http.Request, err error, subject string) {
+	if c.registryDenied(w, r, err) {
+		return
+	}
 	f := refusalFor(err)
 	if !f.NotFound || !wantsPage(r) {
 		c.fail(w, r, err)
 		return
 	}
-	f.Heading = "Subject not found"
-	f.Message = fmt.Sprintf("There is no subject named %q in the schema registry.", subject)
-	page := errorPage{Section: "schemas", Back: schemasPath(c.prefix)}
-	if rows, lerr := c.reg.Subjects(r.Context()); lerr == nil {
-		var names []string
-		for _, row := range rows {
-			names = append(names, row.Name)
+	ctx := r.Context()
+	list, _ := c.reg.Subjects(ctx)
+	var names []string
+	byName := map[string]SubjectRow{}
+	for _, row := range list {
+		names = append(names, row.Name)
+		byName[row.Name] = row
+	}
+	var close []SubjectRow
+	for _, s := range c.closeNames(names, subject, c.schemaURL) {
+		if row, ok := byName[s.Name]; ok {
+			close = append(close, row)
 		}
-		page.Suggestions = c.closeNames(names, subject, c.schemaURL)
 	}
-	c.renderError(w, r, f, page)
+	code, msg := 40401, fmt.Sprintf("Subject '%s' not found.", subject)
+	var re *regError
+	if errors.As(err, &re) {
+		code, msg = re.Code, re.Message
+	}
+	raw, _ := json.Marshal(map[string]any{"error_code": code, "message": msg})
+	data := map[string]any{"List": list, "Page": "schemas", "View": "schema_notfound", "Title": "Subject not found",
+		"Subject": subject, "Close": close, "Others": len(list), "Code": code, "Raw": string(raw),
+		"RegisterURL": newSchemaPath(c.prefix) + "?subject=" + url.QueryEscape(subject)}
+	if deleted, err := c.reg.DeletedSubjects(ctx); err == nil {
+		data["SoftDeleted"] = slices.Contains(deleted, subject)
+	}
+	if len(close) > 0 {
+		data["Why"] = closeWhy(subject, close[0].Name)
+	}
+	if len(close) > 0 {
+		data["Near"] = close[0].Name
+	}
+	// The dock is the calls that named this subject: a client's lookup that was told 40401.
+	maps.Copy(data, c.dockData(DockFilter{Subject: subject}))
+	w.Header().Set("X-Doze-Page", "error")
+	c.shellData(r, data)
+	c.execute(w, http.StatusNotFound, "schema_notfound", data, true)
 }
 
-// schemaCheck answers, beside the form, whether the schema in it may be registered.
-func (c *Console) schemaCheck(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	subject := groupFromSegment(r.PathValue("subject"))
-	body, err := schemaFromForm(r)
-	if err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	ok, reasons, err := c.reg.Check(r.Context(), subject, body)
-	if err != nil {
-		var re *regError
-		if errors.As(err, &re) && re.Status == http.StatusUnprocessableEntity {
-			// A schema that does not parse is an answer to this question, not a failure:
-			// the registry's refusal (42201), said as one (A2), in the check's place.
-			c.partial(w, "schema_check", map[string]any{"Invalid": refusalFor(err).data(nil)})
-			return
+// closeWhy is Sc-16's "Matched on the name you asked for: one letter short of
+// orders."
+func closeWhy(asked, found string) string {
+	d := editDistance(strings.ToLower(asked), strings.ToLower(found))
+	// The word of the name that differs, when one does ("orders" against "order").
+	of := "it"
+	if d == 1 {
+		split := func(s string) []string {
+			return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return r == '.' || r == '-' || r == '_' })
 		}
-		c.fail(w, r, err)
-		return
-	}
-	level, _, _ := c.reg.Compat(r.Context(), subject)
-	c.partial(w, "schema_check", map[string]any{"OK": ok, "Reasons": reasons, "Level": level})
-}
-
-func (c *Console) schemaRegister(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	subject := groupFromSegment(r.PathValue("subject"))
-	body, err := schemaFromForm(r)
-	if err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	if _, err := c.reg.Register(r.Context(), subject, body); err != nil {
-		c.fail(w, r, err)
-		return
-	}
-	c.redirect(w, r, c.schemaURL(subject), "Schema registered")
-}
-
-func (c *Console) schemaConfig(w http.ResponseWriter, r *http.Request) {
-	if c.registryOff(w, r) {
-		return
-	}
-	subject := groupFromSegment(r.PathValue("subject"))
-	level := r.FormValue("level")
-	var err error
-	if level == "" || level == "default" {
-		err = c.reg.ClearCompat(r.Context(), subject)
-		var re *regError
-		if errors.As(err, &re) && re.Status == http.StatusNotFound {
-			err = nil // it was not set.
+		have := map[string]bool{}
+		for _, w := range split(asked) {
+			have[w] = true
 		}
-	} else {
-		err = c.reg.SetCompat(r.Context(), subject, level)
+		var differ []string
+		for _, w := range split(found) {
+			if !have[w] {
+				differ = append(differ, w)
+			}
+		}
+		if len(differ) == 1 {
+			of = differ[0]
+		}
 	}
-	if err != nil {
-		c.fail(w, r, err)
-		return
+	switch {
+	case d == 1 && len(found) == len(asked)+1:
+		return "one letter short of " + of + "."
+	case d == 1 && len(asked) == len(found)+1:
+		return "one letter more than " + of + "."
+	case d == 1:
+		return "one letter differs from " + of + "."
+	case strings.Contains(found, asked):
+		return fmt.Sprintf("%q is part of its name.", asked)
+	case strings.Contains(asked, found):
+		return fmt.Sprintf("its name is part of %q.", asked)
 	}
-	c.redirect(w, r, c.schemaURL(subject), "Compatibility updated")
+	return fmt.Sprintf("%d letters differ.", d)
 }
 
+// schemaDelete is Sc-12's two deletes. A version is soft-deleted: it leaves the
+// list and lookups, and its id still resolves, so every message written with it
+// still decodes. A subject is deleted for good, which is two calls in the order the
+// registry asks for them (a soft delete, then the permanent one), and only when its
+// name was typed to confirm it (confirm=<subject>). A subject a client already
+// soft-deleted (SCH-17) takes the permanent call alone.
 func (c *Console) schemaDelete(w http.ResponseWriter, r *http.Request) {
 	if c.registryOff(w, r) {
 		return
 	}
+	ctx := r.Context()
 	subject := groupFromSegment(r.PathValue("subject"))
 	if v := r.FormValue("version"); v != "" {
 		n, err := strconv.Atoi(v)
@@ -388,22 +359,34 @@ func (c *Console) schemaDelete(w http.ResponseWriter, r *http.Request) {
 			c.fail(w, r, badInput("%q is not a version", v))
 			return
 		}
-		if err := c.reg.DeleteVersion(r.Context(), subject, n); err != nil {
+		if err := c.reg.SoftDeleteVersion(ctx, subject, n); err != nil {
 			c.fail(w, r, err)
 			return
 		}
-		if rest, err := c.reg.Versions(r.Context(), subject); err == nil && len(rest) > 0 {
-			c.redirect(w, r, c.schemaURL(subject), "Version "+v+" deleted")
+		if rest, err := c.reg.Versions(ctx, subject); err == nil && len(rest) > 0 {
+			c.redirect(w, r, c.schemaURL(subject), "Version "+v+" soft-deleted; its id still resolves")
 			return
 		}
-		c.redirect(w, r, schemasPath(c.prefix), "Version deleted — that was the last one, so the subject is gone")
+		c.redirect(w, r, schemasPath(c.prefix), "Version "+v+" soft-deleted: it was the last one, so the subject is listed under Soft-deleted")
 		return
 	}
-	if err := c.reg.DeleteSubject(r.Context(), subject); err != nil {
+	if r.FormValue("confirm") != subject {
+		c.fail(w, r, badInput("type the subject's name to delete it for good"))
+		return
+	}
+	if err := c.reg.SoftDeleteSubject(ctx, subject); err != nil {
+		var re *regError
+		// 40404: a client soft-deleted it already; the permanent call is what is left.
+		if !errors.As(err, &re) || re.Code != 40404 {
+			c.fail(w, r, err)
+			return
+		}
+	}
+	if err := c.reg.PermanentDeleteSubject(ctx, subject); err != nil {
 		c.fail(w, r, err)
 		return
 	}
-	c.redirect(w, r, schemasPath(c.prefix), "Subject deleted")
+	c.redirect(w, r, schemasPath(c.prefix), "Subject deleted for good")
 }
 
 // topicSchemas lists the subjects that belong to a topic by the usual naming
@@ -414,20 +397,76 @@ type topicSchema struct {
 	TypeLabel           string
 }
 
-func (c *Console) topicSchemas(r *http.Request, topic string) []topicSchema {
+// topicSchemas is the subjects a topic's records are written with: the ones named for
+// it (<topic>-key, <topic>-value), and, when the registry holds subjects named for no
+// topic (RecordNameStrategy, TopicRecordNameStrategy), those whose ids its newest
+// records carry (SCH-26).
+func (c *Console) topicSchemas(r *http.Request, topic string, partitions int32) []topicSchema {
 	if c.reg == nil {
 		return nil
 	}
+	ctx := r.Context()
 	var out []topicSchema
 	for _, part := range []string{"key", "value"} {
 		subject := topic + "-" + part
-		v, err := c.reg.Version(r.Context(), subject, 0)
+		v, err := c.reg.Version(ctx, subject, 0)
 		if err != nil {
 			continue
 		}
 		out = append(out, topicSchema{Label: part, Subject: subject, URL: c.schemaURL(subject), Version: v.Version, TypeLabel: v.TypeLabel()})
 	}
+	if !c.reg.hasRecordNamedSubjects(ctx) {
+		return out
+	}
+	seen := map[string]bool{}
+	for _, s := range out {
+		seen[s.Subject] = true
+	}
+	for _, id := range c.newestSchemaIDs(ctx, topic, partitions) {
+		svs, err := c.reg.IDVersions(ctx, id)
+		if err != nil {
+			continue
+		}
+		for _, sv := range svs {
+			if seen[sv.Subject] || subjectTopic(sv.Subject) != "" {
+				continue // named for a topic: this one's is listed above, another's is not this topic's
+			}
+			seen[sv.Subject] = true
+			if v, err := c.reg.Version(ctx, sv.Subject, 0); err == nil {
+				out = append(out, topicSchema{Label: "record", Subject: sv.Subject, URL: c.schemaURL(sv.Subject), Version: v.Version, TypeLabel: v.TypeLabel()})
+			}
+		}
+	}
 	return out
+}
+
+// newestRecordsForIDs is how many of each partition's newest records topicSchemas reads.
+const newestRecordsForIDs = 20
+
+// newestSchemaIDs is the schema ids in the keys and values of a topic's newest records.
+func (c *Console) newestSchemaIDs(ctx context.Context, topic string, partitions int32) []int {
+	have := map[int]bool{}
+	var ids []int
+	for p := int32(0); p < partitions; p++ {
+		earliest, latest, err := c.be.PartitionOffsets(ctx, topic, p)
+		if err != nil || latest <= earliest {
+			continue
+		}
+		ms, err := c.be.FetchWindow(ctx, topic, p, max(earliest, latest-newestRecordsForIDs), newestRecordsForIDs)
+		if err != nil {
+			continue
+		}
+		for _, m := range ms {
+			for _, b := range [][]byte{m.Key, m.Value} {
+				if id, ok := schemaregistry.WireID(b); ok && !have[id] {
+					have[id] = true
+					ids = append(ids, id)
+				}
+			}
+		}
+	}
+	sort.Ints(ids)
+	return ids
 }
 
 // msgView dresses a record for a table row, reading its key and value through the

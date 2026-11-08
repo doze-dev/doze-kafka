@@ -1,29 +1,34 @@
 {{/* Schemas. The list (Sc-Home): subject, its language and how many versions it has;
      the page is the home, or one subject (Sc-05: Versions, Compatibility, Register).
-     The registry's own requests are not recorded, so there is no wire dock here. */}}
+     Each ends with the wire dock, read from the registry's own request log. */}}
 {{define "schema_lp"}}
 <aside class="list" aria-label="Subjects">
   <div class="list-filter list-filter-first"><input class="inp m" type="search" placeholder="Filter subjects" aria-label="Filter Schemas" data-filter-target=".list .li" data-filter-none="#list-none" spellcheck="false" autocomplete="off"></div>
-  <div class="row sb list-cols"><span class="cap">Subject</span><span class="cap">Versions</span></div>
+  {{if and .List .Cols}}<div class="row sb list-cols"><span class="cap">Subject</span><span class="cap">Versions</span></div>{{end}}
   <div class="list-scroll">
-    {{if not .List}}<div class="note list-note"><b>{{t "schemas.none.title"}}</b><br>{{t "schemas.none.hint"}}</div>{{end}}
+    {{if .New}}<div class="li two on" aria-current="page"><span class="col grow"><span class="m el">New subject</span><span class="note">not saved yet</span></span></div>{{end}}
+    {{if and (not .List) (not .New)}}<div class="col g4 list-none"><span class="b">{{t "schemas.none.title"}}</span><span class="note">{{t "schemas.none.hint"}}</span></div>{{end}}
     {{range .List}}
-    <a class="li two {{if eq .Name $.Sel}}on{{end}}" href="{{schemaURL .Name}}" data-name="{{.Name}}"{{if eq .Name $.Sel}} aria-current="page"{{end}}>
+    <a class="li two {{if eq .Name $.Sel}}on{{end}}{{if and $.Near (eq .Name $.Near)}} near{{end}}" href="{{schemaURL .Name}}" data-name="{{.Name}}"{{if eq .Name $.Sel}} aria-current="page"{{end}}>
       <span class="col grow"><span class="m el">{{.Name}}</span><span class="note">{{.TypeLabel}}</span></span>
       <span class="pill">{{.TypeShort}}</span><span class="m b">{{.Versions}}</span>
     </a>
     {{end}}
     <div class="note list-note" id="list-none" hidden>No subject matches the filter.</div>
+    {{if .Deleted}}<div class="list-deleted" id="list-deleted"><span class="cap">Soft-deleted</span>
+      {{range .Deleted}}<div class="li two" data-name="{{.Name}}"><span class="col grow"><span class="m el mut">{{.Name}}</span><span class="note">not listed or looked up</span></span>
+        <button type="button" class="btn sm danger" hx-post="{{schemaURL .Name}}/delete" hx-disabled-elt="this" data-confirm-url="{{confirmURL "schema.delete" "subject" .Name}}" data-confirm-title="{{.Confirm.Title}}" data-confirm-verb="{{.Confirm.Verb}}" hx-confirm="{{.Confirm.Text}}" aria-label="Delete for good: {{.Name}}">Delete for good</button></div>{{end}}
+    </div>{{end}}
   </div>
-  <div class="note list-note list-foot ruled">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}{{with .IDs}}{{if .Count}}, {{.Count}} schema{{if ne .Count 1}}s{{end}}, {{if eq .From .To}}id {{.From}}{{else}}ids {{.From}} to {{.To}}{{end}}{{end}}{{end}}.{{with .IDs}}{{if .Unused}} {{if eq (len .Unused) 1}}Id{{else}}Ids{{end}} {{range $i, $u := .Unused}}{{if $i}}, {{end}}{{$u}}{{end}}{{if .More}} and {{.More}} more{{end}} {{if and (eq (len .Unused) 1) (not .More)}}is{{else}}are{{end}} not in use here.{{end}}{{end}}</div>
+  {{if .List}}<div class="note list-note list-foot ruled">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}{{with .IDs}}{{if .Count}}, {{.Count}} schema{{if ne .Count 1}}s{{end}}, {{if eq .From .To}}id {{.From}}{{else}}ids {{.From}} to {{.To}}{{end}}{{end}}{{end}}.{{with .IDs}}{{if .Unused}} {{if eq (len .Unused) 1}}Id{{else}}Ids{{end}} {{range $i, $u := .Unused}}{{if $i}}, {{end}}{{$u}}{{end}}{{if .More}} and {{.More}} more{{end}} {{if and (eq (len .Unused) 1) (not .More)}}is{{else}}are{{end}} not in use here.{{end}}{{end}}</div>{{end}}
 </aside>
 {{end}}
 
 {{define "schemas_home"}}{{template "shell_top" .}}
-  {{template "schema_lp" (dict "List" .List "Sel" "" "IDs" .IDs)}}
-  <main class="main" id="detail">
+  {{template "schema_lp" (dict "List" .List "Sel" "" "IDs" .IDs "Cols" true "Deleted" .Deleted)}}
+  <main class="main{{if not .Rows}} sc-none-main{{end}}" id="detail">
     <div class="row sb ce idband">
-      <div class="col"><h1 class="h1">Schemas</h1><span class="note">The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}}. Confluent's REST API, so stock serializers work with only <span class="m">schema.registry.url</span> changed.</span></div>
+      <div class="col"><h1 class="h1">Schemas</h1><span class="note">{{if .Rows}}The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}}. Confluent's REST API, so stock serializers work with only <span class="m">schema.registry.url</span> changed.{{else}}The built-in registry{{if .RegistryHost}} at <span class="m">{{.RegistryHost}}</span>{{end}} is running and empty.{{end}}</span></div>
       <div class="row g8 ce"><a class="btn pri w5" href="{{newSchemaURL ""}}" data-create>Register schema</a></div>
     </div>
 
@@ -55,136 +60,534 @@
       {{if .RegistryURL}}<div class="callout grow"><span class="b">Point a client here</span><span class="m">schema.registry.url={{.RegistryURL}}</span><span class="note">{{if .SASL}}SASL is on, so clients also send <span class="m">basic.auth.user.info</span> with the same user and password.{{else}}No authentication is needed.{{end}}</span></div>{{end}}
     </div>
     {{else}}
-    <div class="callout"><span class="b">{{t "schemas.none.title"}}</span><span class="note">{{t "schemas.none.hint"}}</span></div>
+    {{/* Sc-01: nothing registered. What a stock serializer does on its first produce,
+         with this broker's and this registry's addresses. */}}
+    <div class="callout sc-none-lead"><span class="b">Nothing exists yet. This is not an error.</span>
+      <span>Stock serializers register their own schema the first time they produce. You do not have to register anything by hand to start.</span></div>
+    <div class="row g12 sc-none">
+      <div class="card grow"><div class="pad col g8">
+        <span class="h2">How a stock serializer registers on first produce</span>
+        <div class="row g8"><span class="num">1</span><span>The producer is configured with the registry address.</span></div>
+        <pre class="code sc-props">{{range $i, $p := .ProducerProps}}{{if $i}}
+{{end}}{{if .Comment}}<span class="c">{{.Key}}</span>{{else if eq .Key "schema.registry.url"}}<span class="kw">{{.Key}}</span>={{.Value}}{{else}}{{.Key}}={{.Value}}{{end}}{{end}}</pre>
+        <div class="row g8"><span class="num">2</span><span>On the first record, the serializer sends the schema to <span class="m">POST /subjects/{{.SampleTopic}}-value/versions</span>. The subject name is the topic name plus <span class="m">-value</span> (TopicNameStrategy).</span></div>
+        <div class="row g8"><span class="num">3</span><span>The registry answers with an id. The serializer prefixes every message with magic byte 0 and that id (5 bytes), and this console uses the id to decode the message.</span></div>
+      </div></div>
+      <div class="col g12 sc-none-side">
+        <div class="callout"><span class="b">Use a different strategy</span><span class="note">With <span class="m">RecordNameStrategy</span> the subject is the record's full name, for example <span class="m">harbour.checkout.Order</span>. Both work here.</span></div>
+        <div class="callout"><span class="b">Or register by hand</span><span class="note">Useful when the producer runs with <span class="m">auto.register.schemas=false</span>, or when you want to test compatibility rules first.</span><a class="btn w5" href="{{newSchemaURL ""}}">Register schema</a></div>
+      </div>
+    </div>
+    <div class="grow"></div>
     {{end}}
   </main>
+  {{template "wire_dock" .}}
 {{template "shell_bottom" .}}{{end}}
 
+{{/* Sc-14: no registry. Switched off at start (--schema-registry=false), or its
+     records in meta.db could not be read (Reason). The rail keeps Schemas (SCH-32). */}}
 {{define "schemas_off"}}{{template "shell_top" .}}
-  <main class="main" id="detail">
-    <div class="row sb ce idband"><div class="col"><h1 class="h1">Schemas</h1><span class="note">No schema registry is connected to this console.</span></div></div>
-    <div class="callout" role="note"><span class="note">doze-kafka serves a Confluent-compatible schema registry beside the broker (<code>--schema-registry</code>, on by default). Start it, or give the console one, to see subjects, versions and decoded messages here.</span></div>
-  </main>
-{{template "shell_bottom" .}}{{end}}
-
-{{define "schema_create"}}{{template "shell_top" .}}
-  {{template "schema_lp" (dict "List" .List "Sel" "")}}
-  <main class="main" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{prefix}}/schemas">‹ Schemas</a></div>
-    <div class="row sb ce idband"><div class="col"><h1 class="h1">Register schema</h1><span class="note">The first version of a subject. The registry checks that the text parses.</span></div></div>
-    <form class="form-page" hx-post="{{newSchemaURL ""}}" hx-disabled-elt="find button[type=submit]">
-      <div class="card form-sec"><div class="panel-h"><h2>Subject</h2></div><div class="form-b">
-        <div class="field"><label for="f-subject">Subject <span class="hint">{{subjectNameRule}}</span></label><input class="input mono" id="f-subject" name="subject" value="{{.Subject}}" placeholder="orders-value" required autocomplete="off" autofocus></div>
-        <div class="field narrow"><label for="f-type">Language</label>
-          <select class="input" id="f-type" name="type">{{range .Types}}<option value="{{.}}">{{.}}</option>{{end}}</select></div>
-        <div class="field"><label for="f-schema">Schema</label><textarea class="input mono schema-text" id="f-schema" name="schema" rows="14" required spellcheck="false" placeholder='{"type":"record","name":"Order","fields":[{"name":"id","type":"long"}]}'></textarea></div>
-      </div></div>
-      <div class="err form-err" data-err-slot hidden role="alert"></div>
-      <div class="det-foot">
-        <a class="btn" href="{{prefix}}/schemas">Cancel</a>
-        <button class="btn pri" type="submit">Register</button>
-      </div>
-    </form>
-  </main>
-{{template "shell_bottom" .}}{{end}}
-
-{{define "schema_detail"}}{{template "shell_top" .}}
-  {{template "schema_lp" (dict "List" .List "Sel" .Sel)}}
-  <main class="main" id="detail">
-    <div class="backrow"><a class="btn sm" href="{{prefix}}/schemas">‹&nbsp;<span class="back-wide">Schemas</span><span class="back-narrow">All subjects</span></a><span class="note">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}, the list is one tap away</span></div>
+  <aside class="list" aria-label="Subjects">
+    <div class="list-filter list-filter-first"><input class="inp m" type="search" placeholder="Filter subjects" aria-label="Filter Schemas" disabled></div>
+    <div class="col g4 list-none sc-off-none"><span class="b">No registry to list</span><span class="note">Subjects live in the registry, and it is not running. Nothing was lost: schemas, if any, stay in <span class="m">{{.DataDir}}/meta.db</span>.</span></div>
+  </aside>
+  <main class="main sc-none-main" id="detail">
     <div class="row sb ce idband">
-      <div class="row ce g8 wrap"><h1 class="h1 m">{{.Subject}}</h1><span class="pill">{{.Cur.TypeLabel}}</span></div>
+      <div class="col"><h1 class="h1">Schemas</h1><span class="note">{{if .Reason}}The schema registry did not start for this broker.{{else}}The schema registry is switched off for this broker.{{end}}</span></div>
+      <div class="row g8 ce idband-acts"><button type="button" class="btn pri" data-copy="{{.TurnOn}}" data-copy-command>Copy the command to turn it on</button></div>
+    </div>
+    {{if .Reason}}<div class="callout bad" role="alert" data-registry-off-reason>
+      <div class="row ce g8"><span class="b">Did not start</span><span class="m">meta.db</span></div>
+      <span>The registry's records in meta.db could not be read ({{.Reason}}). The broker runs without it, and nothing in meta.db was changed.</span>
+    </div>
+    {{else}}<div class="callout warn" role="note">
+      <div class="row ce g8"><span class="b">Not running</span><span class="m">--schema-registry=false</span></div>
+      <span>doze-kafka was started with the registry off, so nothing listens for it and clients that point <span class="m">schema.registry.url</span> at it get connection refused. This is a choice made at start, not a fault.</span>
+    </div>{{end}}
+    <div class="row g12">
+      <div class="card grow"><div class="pad col g8">
+        <span class="h2">Turn it on</span>
+        <span class="note">Restart the broker without the flag. The default is on, so removing <span class="m">--schema-registry=false</span> is enough.</span>
+        <pre class="code sc-cmd"><span class="c"># now</span>
+doze-kafka --data-dir {{.DataDir}} --schema-registry=false
+<span class="c"># to turn it on</span>
+{{.TurnOn}}
+<span class="c"># or choose where it listens</span>
+doze-kafka --data-dir {{.DataDir}} --schema-registry-addr {{.Example}}</pre>
+        <span class="note">The console cannot restart the broker for you, so this page gives the command and stops there.</span>
+      </div></div>
+      <div class="card sc-where"><div class="pad col g8">
+        <span class="h2">Where it listens when it is on</span>
+        <div class="card" style="--c: 1fr 1fr">
+          <div class="r h"><span>Mode</span><span>Address</span></div>
+          <div class="r"><span>Beside the broker (default)</span><span class="m el">port 8081 on its address</span></div>
+          <div class="r"><span class="m">--listen</span><span class="m">{{.Example}}</span></div>
+          <div class="r"><span class="m el">--schema-registry-addr</span><span class="m">host:port</span></div>
+        </div>
+        <span class="note">A taken port is an error naming <span class="m">--schema-registry-addr</span>, not a registry that quietly is not there.</span>
+      </div></div>
+    </div>
+    <div class="card pad col g8">
+      <span class="h2">What still works without it</span>
+      <div class="row g16 wrap">
+        <a class="well pad col grow sc-still" href="{{prefix}}/topics"><span class="b">Topics</span><span class="note">Messages show as plain text, JSON or raw bytes. A message with the 5-byte schema header is shown raw, with the reason "registry is off".</span></a>
+        <a class="well pad col grow sc-still" href="{{prefix}}/traffic"><span class="b">Traffic and Trace</span><span class="note">Unchanged. Producers that use a registry fail on the client side, and show up there.</span></a>
+        <a class="well pad col grow sc-still" href="{{prefix}}/connect"><span class="b">Connect an app</span><span class="note">The snippets leave the registry line out while it is off.</span></a>
+      </div>
+    </div>
+    <div class="grow"></div>
+  </main>
+{{template "shell_bottom" .}}{{end}}
+
+{{/* Register (Sc-02 to Sc-04, Sc-10): a new subject, or the next version of one. The form
+     is the page's column; Check answers in #reg-answer, and so does Register when the
+     registry refuses (Sc-04). */}}
+{{define "schema_register"}}{{template "shell_top" .}}
+  {{template "schema_lp" (dict "List" .List "Sel" .Sel "New" (not .P.Existing))}}
+  <main class="main sc-main" id="detail">
+    <div class="backrow"><a class="btn sm" href="{{if .P.Existing}}{{.SubjectURL}}{{else}}{{prefix}}/schemas{{end}}" data-esc>‹&nbsp;{{if .P.Existing}}{{.P.Draft.Subject}}{{else}}Schemas{{end}}</a></div>
+    <form id="reg-form" class="sc-reg-form" hx-post="{{newSchemaURL ""}}/check" hx-target="#reg-answer" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="find button[type=submit]" data-mod-enter>
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">{{if .P.Existing}}Register a new version{{else}}Register schema{{end}}</h1>
+        <span class="note">{{if .P.Existing}}Subject <a class="m" href="{{.SubjectURL}}">{{.P.Draft.Subject}}</a> · latest is v{{.P.Latest}}, id {{.P.LatestID}} · level {{.P.Level}}{{if not .P.Own}} (global){{end}}{{else}}A new subject, or a new version of an existing one. Same fields as <span class="m">POST /subjects/{subject}/versions</span>.{{end}}</span></div>
+      <div class="row g8 ce idband-acts">{{template "schema_reg_head" (dict "Existing" .P.Existing "Latest" .P.Latest "OK" false)}}</div>
+    </div>
+
+    <div class="card"><div class="pad col g12">
+      <div class="row g16">
+        <div class="col g4 grow"><label class="b" for="f-subject">Subject</label><input id="f-subject" class="inp m" name="subject" value="{{.P.Draft.Subject}}" placeholder="orders-value" required autocomplete="off" spellcheck="false"{{if .P.Existing}} readonly{{else}} autofocus{{end}}>
+          {{if not .P.Existing}}<span class="note">Topic-name strategy: the subject is the topic name plus <span class="m">-value</span> (or <span class="m">-key</span>).{{if .P.Topic}} The topic <span class="m">{{.P.Topic}}</span> {{if .P.TopicOK}}exists{{else}}does not exist yet; a subject can be registered before its topic{{end}}.{{end}}</span>{{end}}</div>
+        <div class="col g4 sc-opt"><span class="b">Type</span>
+          <div class="seg sc-seg" role="radiogroup" aria-label="Schema type">{{range .Types}}<label class="{{if eq . $.P.Draft.Type}}on{{end}}"><input type="radio" class="sr-only" name="type" value="{{.}}"{{if eq . $.P.Draft.Type}} checked{{end}}{{if $.P.Existing}} disabled{{end}}>{{if eq . "PROTOBUF"}}Protobuf{{else if eq . "JSON"}}JSON Schema{{else}}Avro{{end}}</label>{{end}}</div>
+          {{if .P.Existing}}<input type="hidden" name="type" value="{{.P.Draft.Type}}">{{else}}<span class="note">Sent as <span class="m">schemaType</span>; Avro is the default when it is left out.</span>{{end}}</div>
+      </div>
+      <div class="col g4">
+        <div class="row sb ce"><label class="b" for="f-schema">Schema</label><span class="note" id="reg-stats">{{template "schema_reg_stats" (dict "D" .P.Draft)}}</span></div>
+        {{template "schema_reg_text" .}}
+      </div>
+      <div class="row g16">
+        <div class="col g4 grow" id="reg-refs"><span class="b">References</span>
+          {{if .P.Draft.Refs}}<div class="card sc-refs" style="--c: 1fr 1fr 56px 52px">
+            <div class="r h"><span>Name used in the schema</span><span>Subject</span><span>Version</span><span></span></div>
+            {{range .P.Draft.Refs}}<div class="r" data-ref-row><span class="m el">{{.Name}}</span><a class="m el" href="{{schemaURL .Subject}}?version={{.Version}}">{{.Subject}}</a><span class="m">{{.Version}}</span><button type="button" class="btn ghost sm" aria-label="Remove reference" data-ref-remove>×</button>
+              <input type="hidden" name="ref_name" value="{{.Name}}"><input type="hidden" name="ref_subject" value="{{.Subject}}"><input type="hidden" name="ref_version" value="{{.Version}}"></div>{{end}}
+          </div>
+          <div class="row g8 ce"><button type="button" class="btn sm" data-add-ref>Add reference</button><span class="note">A reference is the pair subject and version. The registry parses this schema with that one in scope. A referenced version cannot be deleted while anything references it (error 42206).</span></div>
+          {{else if .P.Existing}}<div class="row ce g8 sc-refs-few"><span class="note">None.</span><button type="button" class="btn ghost sm" data-add-ref>Add reference</button></div>
+          {{else}}<div class="well row sb ce sc-refs-none"><span class="note">None. A reference names another subject's version this schema uses (Avro named type, JSON Schema <span class="m">$ref</span>, Protobuf <span class="m">import</span>).</span><button type="button" class="btn sm" data-add-ref>Add reference</button></div>{{end}}
+          <template id="ref-row-new"><div class="row g8 ce sc-ref-new" data-ref-row><input class="inp m" name="ref_name" placeholder="name in the schema" aria-label="Name used in the schema"><input class="inp m" name="ref_subject" placeholder="subject" aria-label="Subject"><input class="inp m sc-ref-v" name="ref_version" placeholder="1" aria-label="Version" inputmode="numeric"><button type="button" class="btn ghost sm" aria-label="Remove reference" data-ref-remove>×</button></div></template>
+        </div>
+        {{if .P.Existing}}<label class="row ce g8 sc-opt"><input type="checkbox" name="normalize" value="1" aria-label="Normalize"{{if .P.Draft.Normalize}} checked{{end}}> <span title="?normalize=true: field order and namespaces are rewritten to the canonical form, so the same schema written two ways gets one id">Normalize before storing</span></label>
+        {{else}}<div class="col g4 sc-opt"><span class="b">Options</span>
+          <label class="row ce g8"><input type="checkbox" name="normalize" value="1" aria-label="Normalize"{{if .P.Draft.Normalize}} checked{{end}}> <span>Normalize before storing <span class="m mut">?normalize=true</span></span></label>
+          <span class="note">Rewrites field order and namespaces to the canonical form, so the same schema written two ways gets one id.</span></div>{{end}}
+      </div>
+      <div class="err form-err" data-err-slot data-err-html hidden role="alert"></div>
+    </div></div>
+
+    {{if .Resolved}}<div class="col g8" id="reg-resolved"><div class="row sb ce"><span class="h2">Resolved view</span><span class="note">referenced types inlined, as a client sees it</span></div>
+      <pre class="code sc-text sc-pull">{{jsonTint .Resolved}}</pre></div>{{end}}
+
+    <div id="reg-answer" aria-live="polite">{{template "schema_reg_first" .P}}</div>
+    {{template "schema_reg_acts" (dict "P" .P "OK" false)}}
+    </form>
+    <div class="grow"></div>
+  </main>
+  {{template "wire_dock" .}}
+{{template "shell_bottom" .}}{{end}}
+
+{{define "schema_reg_stats"}}{{with .D}}{{if eq .Type "PROTOBUF"}}Protobuf{{else if eq .Type "JSON"}}JSON Schema{{else}}Avro{{end}}{{if .Schema}} · {{lines .Schema}} line{{if ne (lines .Schema) 1}}s{{end}}{{end}}{{if not .Schema}} · empty{{else if $.Parsed}} · parses{{else if eq .Type "PROTOBUF"}}{{else if jsonValid .Schema}} · parses{{else}} · not JSON yet{{end}}{{end}}{{end}}
+
+{{/* The schema field: the editor, with the board's line numbers. Its own element, so a
+     fix (Sc-04's Add default) replaces the text and nothing else. */}}
+{{define "schema_reg_text"}}<div class="row sc-code" id="reg-text"><pre class="code sc-gutter" aria-hidden="true" data-gutter>{{gutter .P.Draft.Schema}}</pre><textarea class="code grow sc-editor" id="f-schema" name="schema" rows="{{if .P.Draft.Schema}}{{lines .P.Draft.Schema}}{{else}}11{{end}}" required spellcheck="false" autocomplete="off" aria-label="Schema">{{.P.Draft.Schema}}</textarea></div>{{end}}
+
+{{/* A fix's answer: the text with it applied, and the actions with Check again. */}}
+{{define "schema_reg_fixed"}}{{template "schema_reg_text" .}}
+{{template "schema_reg_acts" (dict "P" .P "Checked" true "OOB" true)}}{{end}}
+
+{{define "schema_reg_head"}}<button class="btn pri" type="button" id="reg-head-btn" data-register{{if not .OK}} disabled{{end}}{{if .OOB}} hx-swap-oob="true"{{end}} hx-post="{{newSchemaURL ""}}" hx-include="#reg-form" hx-target="#reg-answer" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Register{{if .Existing}} v{{inc .Latest}}{{end}}</button>{{end}}
+
+{{define "schema_reg_readonly"}}{{if eq .Mode "READONLY"}}<div class="callout warn" role="note" data-readonly><span class="b">This subject is read-only</span><span class="note">Its mode is READONLY{{if not .ModeOwn}} (the registry's){{end}}: a check still answers, as Confluent's does, but Register will be refused with 42205 until the mode is READWRITE.</span></div>{{end}}{{end}}
+
+{{define "schema_reg_first"}}{{template "schema_reg_readonly" .}}<div class="callout"><span class="b">Not checked yet</span><span class="note">{{if .Existing}}Check compares this with v{{.Latest}} at {{.Level}}{{if not .Own}} (global){{end}}{{if hasSuffix .Level "_TRANSITIVE"}}, and every version before it{{end}}. Nothing is stored until you register.{{else}}New subject: there is no earlier version to be compatible with, so Register will create <span class="m">v1</span>.{{if .NextID}} The first stored schema gets the next free id ({{.NextID}}).{{end}}{{end}}</span></div>{{end}}
+
+{{define "schema_reg_acts"}}<div class="row g8 ce" id="reg-acts"{{if .OOB}} hx-swap-oob="true"{{end}}>
+  {{if .Fix}}<button class="btn" type="button" hx-post="{{newSchemaURL ""}}/fix" hx-include="#reg-form" hx-vals='{"path":"{{.Fix.Path}}"}' hx-target="#reg-text" hx-select="unset" hx-swap="outerHTML">Fix: <span class="m">{{.Fix.FixLabel}}</span></button>
+  {{else}}<button class="btn" type="submit">{{if .Checked}}Check again{{else}}Check compatibility{{end}}</button>{{end}}
+  <button class="btn pri" type="button" data-register{{if not .OK}} disabled{{end}} hx-post="{{newSchemaURL ""}}" hx-include="#reg-form" hx-target="#reg-answer" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Register{{if .P.Existing}} v{{inc .P.Latest}}{{end}}</button>
+  <div class="grow"></div>
+  <span class="note">{{if .Refused}}{{if .P.Existing}}Or relax this subject to NONE under <a href="{{schemaURL .P.Draft.Subject}}?tab=compat">Compatibility</a>. {{end}}Nothing was stored.{{else if .OK}}Registering creates <span class="m">v{{if .P.Existing}}{{inc .P.Latest}}{{else}}1{{end}}</span>{{if .P.NextID}} with the next free id, <span class="m">{{.P.NextID}}</span>{{end}}.{{else}}Registering needs SASL credentials when SASL is on. The console signs in as <span class="m">__console</span>.{{end}}</span>
+</div>{{end}}
+
+{{/* What Check and a refused Register answer, in #reg-answer, with the actions under it. */}}
+{{define "schema_reg_answer"}}
+{{if .Refusal}}{{template "refusal" .Refusal}}
+{{else if .ReadOnly}}<div class="callout deny" role="alert">
+  <div class="row ce g8"><span class="b">Refused</span><span class="m">{{.ReadOnly.Code}}</span><span class="mut">·</span><span class="m">HTTP {{.ReadOnly.Status}}</span></div>
+  <span class="m sc-wrap">{{.RawRefusal}}</span>
+  <span class="note">Rule: a subject in READONLY mode takes no new versions, no deletes and no level changes; reads go on working. Confluent's registry refuses the same register call with the same error code. Nothing was stored{{if .P.NextID}}; the next id is still {{.P.NextID}}{{end}}.</span>
+</div>
+<div class="row g12 sc-ro">
+  <div class="callout grow"><span class="b">Mode</span>
+    <div class="seg" role="group" aria-label="Mode"><span>READWRITE</span><span class="on">READONLY</span></div>
+    <span class="note">{{if .P.ModeOwn}}Set on this subject.{{else}}The registry's own mode, which this subject follows.{{end}} IMPORT and READONLY_OVERRIDE are not supported here.</span>
+    {{if .P.ModeOwn}}<button class="btn sc-ro-btn" type="button" hx-post="{{schemaURL .P.Draft.Subject}}/mode" hx-vals='{"mode":"READWRITE"}'>Set READWRITE for this subject</button>{{end}}</div>
+  <div class="callout grow"><span class="b">Why would it be read-only</span><span class="note">Someone froze it on purpose, to stop a producer with <span class="m">auto.register.schemas=true</span> from adding versions. The producer then fails with this same {{.ReadOnly.Code}}.</span></div>
+</div>
+{{else if .Refused}}<div class="callout deny" role="alert">
+  <div class="row ce g8"><span class="b">Refused</span><span class="m">409 Conflict</span><span class="mut">·</span><span class="m">error_code {{.Refused.Code}}</span></div>
+  <span class="m sc-wrap">{{.RawRefusal}}</span>
+  <span class="note">Rule: {{.Rule}} Confluent Schema Registry refuses the same call with the same status, error code and reasons.</span>
+</div>
+{{template "schema_reg_findings" .}}
+{{else if .Parses}}{{template "schema_reg_readonly" .P}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Parses</span><span class="m">a first version, v1</span></div>
+  <span class="note">Checked just now: the registry parsed it. A new subject has nothing to be compatible with. Nothing is stored yet.</span></div>
+{{else if .OK}}{{template "schema_reg_readonly" .P}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Compatible</span><span class="m">compatible with {{range $i, $v := .Compared}}{{if $i}}, {{end}}v{{$v}}{{else}}v{{.P.Latest}}{{end}} ({{.Level}})</span></div>
+  <span class="note">Checked just now against {{if gt (len .Compared) 1}}every earlier version{{else}}the latest version{{end}} with <span class="m">POST /compatibility/subjects/{{.P.Draft.Subject}}/versions/latest</span>. {{.Why}} Nothing is stored yet.</span></div>
+{{else}}<div class="callout bad" role="alert"><div class="row ce g8"><span class="b">Not compatible</span><span class="m">with {{range $i, $v := .Compared}}{{if $i}}, {{end}}v{{$v}}{{end}} ({{.Level}})</span></div>
+  <span class="note">Registering it would be refused (409). Nothing is stored.</span></div>
+{{template "schema_reg_findings" .}}
+{{end}}
+{{if not .Refusal}}<span class="note" id="reg-stats" hx-swap-oob="true">{{template "schema_reg_stats" (dict "D" .P.Draft "Parsed" true)}}</span>
+{{template "schema_reg_acts" (dict "P" .P "OK" (or .OK .Parses) "Checked" true "Refused" (or .Refused .Findings) "Fix" (firstFix .Findings) "OOB" true)}}
+{{template "schema_reg_head" (dict "Existing" .P.Existing "Latest" .P.Latest "OK" (or .OK .Parses) "OOB" true)}}{{end}}
+{{end}}
+
+{{define "schema_reg_findings"}}{{if .Findings}}<div class="card sc-findings" style="--c: 36px 250px 1fr 120px">
+  <div class="r h"><span>#</span><span>Incompatibility</span><span>Where and why</span><span>Fix</span></div>
+  {{range .Findings}}<div class="r"><span class="m">{{.N}}</span><span class="m b bad el" title="{{.Type}}">{{.Type}}</span><span class="el" title="{{.Description}}">{{if .Path}}<span class="m">{{.Path}}</span>: {{end}}{{.Description}}</span>
+    {{if .Fix}}<button type="button" class="btn sm" hx-post="{{newSchemaURL ""}}/fix" hx-include="#reg-form" hx-vals='{"path":"{{.Path}}"}' hx-target="#reg-text" hx-select="unset" hx-swap="outerHTML" title="{{.FixWhat}}">{{.Fix}}</button>{{else}}<span class="note">—</span>{{end}}</div>{{end}}
+</div>{{end}}{{end}}
+
+{{define "schema_type_pill"}}{{if eq . "PROTOBUF"}}PROTOBUF{{else if eq . "JSON"}}JSON SCHEMA{{else}}AVRO{{end}}{{end}}
+
+{{/* A subject's title band: its name and type, Register new version, and ···. */}}
+{{define "schema_band"}}
+    <div class="row sb ce idband">
+      <div class="row ce g8"><h1 class="h1 m">{{.Subject}}</h1><span class="pill">{{template "schema_type_pill" .Cur.Type}}</span>{{if eq .Mode "READONLY"}}<span class="pill warn">READONLY</span>{{end}}{{if .ByClient}}<span class="pill ok">registered by a client</span>{{end}}</div>
       <div class="row g8 ce idband-acts">
-        <a class="btn pri" href="{{schemaURL .Subject}}?tab=register" data-create>Register new version</a>
+        {{if eq .Tab "compat"}}<button class="btn pri" type="submit" form="compat-form" data-save>Save level</button>
+        {{else}}<a class="btn pri w5" href="{{.NewVersionURL}}" data-create data-new-version>Register new version</a>{{end}}
         <div class="more"><button type="button" class="btn" aria-label="More actions" title="More actions" aria-expanded="false" data-more>···</button>
           <div class="menu" role="group" aria-label="More actions" hidden>
             <button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" data-confirm-url="{{confirmURL "schema.delete" "subject" .Subject}}" data-confirm-title="{{(index .Confirm "schema.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.delete").Text}}">{{icon "trash"}} Delete subject</button>
-            {{if gt (len .Versions) 1}}<button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-url="{{confirmURL "schema.version.delete" "subject" .Subject "version" .Cur.Version}}" data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
+            {{if .Cur.Version}}<button class="btn danger" hx-disabled-elt="this" hx-post="{{schemaURL .Subject}}/delete" hx-vals='{"version":"{{.Cur.Version}}"}' data-confirm-url="{{confirmURL "schema.version.delete" "subject" .Subject "version" .Cur.Version}}" data-confirm-title="{{(index .Confirm "schema.version.delete").Title}}" data-confirm-verb="{{(index .Confirm "schema.version.delete").Verb}}" hx-confirm="{{(index .Confirm "schema.version.delete").Text}}">{{icon "trash"}} Delete v{{.Cur.Version}}</button>{{end}}
           </div>
         </div>
       </div>
     </div>
+{{end}}
+
+{{/* A subject's neighbours (Sc-05): the topic it is named for and the groups that read
+     it, in the board's well. */}}
+{{define "subject_neighbours"}}{{if .SubjectNeighbours}}<div class="well row ce g12 nbwell sc-nb" id="neighbours"><span class="cap">Neighbours</span>
+{{range $i, $n := .SubjectNeighbours}}{{if $i}}<span class="mut" aria-hidden="true">·</span>{{end}}<a class="row ce g6" href="{{$n.URL}}">{{if eq $n.Kind "topic"}}<span class="sv sm c-tp" aria-hidden="true">TP</span>{{else}}<span class="sv sm c-gr" aria-hidden="true">GR</span>{{end}}<span class="m">{{$n.Name}}</span>{{if $n.Note}}<span class="note">{{$n.Note}}</span>{{end}}</a>{{end}}
+</div>{{end}}{{end}}
+
+{{/* One subject: Sc-05 (Avro), Sc-07 (Protobuf), Sc-08 (JSON Schema), Sc-18 (one version a
+     client's serializer registered). The version a row opens is in the inspector. */}}
+{{define "schema_detail"}}{{template "shell_top" .}}
+  {{template "schema_lp" (dict "List" .List "Sel" .Sel)}}
+  <main class="main sc-main" id="detail">
+    <div class="backrow"><a class="btn sm" href="{{prefix}}/schemas">‹&nbsp;<span class="back-wide">Schemas</span><span class="back-narrow">All subjects</span></a><span class="note">{{len .List}} subject{{if ne (len .List) 1}}s{{end}}, the list is one tap away</span></div>
+    {{template "schema_band" .}}
 
     <div class="row ce g8 wrap" id="subject-facts">
+      {{if eq .Tab "used"}}
+      <span class="m">{{len .Versions}} version{{if ne (len .Versions) 1}}s{{end}}</span><span class="mut">·</span>
+      <span class="m">id{{if ne (len .IDList) 1}}s{{end}} {{range $i, $id := .IDList}}{{if $i}}, {{end}}{{$id}}{{end}}</span>
+      {{if .UnknownCount}}<span class="mut">·</span><span class="m warn">{{.UnknownCount}} message{{if eq .UnknownCount 1}} carries{{else}}s carry{{end}} id{{if ne (len .UnknownIDs) 1}}s{{end}} {{range $i, $id := .UnknownIDs}}{{if $i}}, {{end}}{{$id}}{{end}}, unknown here</span>{{end}}
+      {{if .Framed}}<span class="mut">·</span><span class="m">{{num .Decoded}} of {{num .Framed}} decoded</span>{{end}}
+      {{else if eq .Tab "compat"}}
+      <span class="m">{{len .Versions}} version{{if ne (len .Versions) 1}}s{{end}}</span><span class="mut">·</span>
+      <span class="m">level {{.Compat}}, {{if .CompatOwn}}set on this subject{{else}}the global default{{end}}</span><span class="mut">·</span>
+      <span class="m">global default {{.GlobalLevel}}</span><span class="mut">·</span>
+      <span class="m{{if eq .Mode "READONLY"}} warn{{end}}">mode {{.Mode}}{{if .ModeOwn}}, set on this subject{{end}}</span>
+      {{else if .ByClient}}
+      <span class="m">1 version</span><span class="mut">·</span><span class="m">v{{.Latest}}, id {{.LatestID}}</span><span class="mut">·</span>
+      <span class="m">level {{.Compat}}{{if not .CompatOwn}} (global){{end}}</span><span class="mut">·</span>
+      <span class="m">registered {{when .LastAt "clock"}}{{if .By}} by {{.By}}{{end}}</span>
+      {{else}}
       <span class="m">{{len .Versions}} version{{if ne (len .Versions) 1}}s{{end}}</span><span class="mut">·</span>
       <span class="m">latest v{{.Latest}}, id {{.LatestID}}</span><span class="mut">·</span>
       <span class="m" title="{{if .CompatOwn}}set for this subject{{else}}the registry's default{{end}}">level {{.Compat}}{{if not .CompatOwn}} (global){{end}}</span>
+      {{if eq .Cur.Type "JSON"}}{{if .Shape.Fields}}<span class="mut">·</span><span class="m">{{.Shape.Required}} required of {{len .Shape.Fields}} propert{{if eq (len .Shape.Fields) 1}}y{{else}}ies{{end}}</span>
+        <span class="mut">·</span><span class="m">{{if .Shape.Closed}}closed: additionalProperties false{{else}}open: other properties allowed{{end}}</span>{{end}}
+      {{else}}
+      {{if .Mode}}<span class="mut">·</span><span class="m{{if eq .Mode "READONLY"}} warn{{end}}">mode {{.Mode}}{{if .ModeOwn}}, set on this subject{{if .ModeSetAt}} at {{when .ModeSetAt "clock"}}{{end}}{{end}}</span>{{end}}
+      {{if eq .Cur.Type "PROTOBUF"}}{{if .Shape.Messages}}<span class="mut">·</span><span class="m">{{len .Shape.Messages}} message type{{if ne (len .Shape.Messages) 1}}s{{end}}: {{range $i, $m := .Shape.Messages}}{{if $i}}, {{end}}{{$m}}{{end}}</span>{{end}}
+      {{else if .LastAt}}{{if not .LastAt.IsZero}}<span class="mut">·</span><span class="m">last registered {{when .LastAt "day"}}</span>{{end}}{{end}}
+      {{end}}
+      {{end}}
     </div>
 
-    {{template "neighbours" .}}
+    {{template "subject_neighbours" .}}
 
     <nav class="tabs" aria-label="Subject tabs">
       {{range .Tabs}}<a class="tab {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
     </nav>
 
     {{if eq .Tab "compat"}}
-    <div class="card pad col g8" id="compat-card">
-      <span class="h2">Compatibility level</span>
-      <form class="compat-form" hx-post="{{schemaURL .Subject}}/config">
-        <label class="scope"><span class="sr-only">Compatibility level for {{.Subject}}</span>
-          <select class="input" name="level">
-            <option value="default" {{if not .CompatOwn}}selected{{end}}>registry default ({{if .CompatOwn}}…{{else}}{{.Compat}}{{end}})</option>
-            {{range .Levels}}<option value="{{.}}" {{if and $.CompatOwn (eq . $.Compat)}}selected{{end}}>{{.}}</option>{{end}}
-          </select></label>
-        <button class="btn pri" type="submit" hx-disabled-elt="this">Save</button>
-        <span class="hint teach">{{teach "registry" .Compat}}</span>
-        <span class="hint">New versions are checked against {{if hasPrefix .Compat "BACKWARD"}}what consumers of the older versions read{{else if hasPrefix .Compat "FORWARD"}}what older consumers can still read{{else if hasPrefix .Compat "FULL"}}both directions{{else}}nothing{{end}}{{if and (ne .Compat "NONE") (hasSuffix .Compat "_TRANSITIVE")}}, against every earlier version{{else if ne .Compat "NONE"}}, against the latest version{{end}}.</span>
-      </form>
-    </div>
-    {{else if eq .Tab "register"}}
-    <form class="card pad col g8" id="newver">
-      <input type="hidden" name="type" value="{{.Cur.Type}}">
-      {{if .Cur.References}}<input type="hidden" name="references" value="{{refsJSON .Cur.References}}">{{end}}
-      <div class="field"><label for="f-schema">Schema <span class="hint">starts from the latest version</span></label><textarea class="input mono schema-text" id="f-schema" name="schema" rows="12" spellcheck="false">{{.LatestText}}</textarea></div>
-      <div id="check-result" aria-live="polite"></div>
-      <div class="row g8 ce">
-        <button type="button" class="btn" hx-post="{{schemaURL .Subject}}/check" hx-include="#newver" hx-target="#check-result" hx-select="unset" hx-swap="innerHTML" hx-disabled-elt="this">Check compatibility</button>
-        <button type="button" class="btn pri" hx-post="{{schemaURL .Subject}}/register" hx-include="#newver" hx-disabled-elt="this">Register</button>
-        <span class="note">Nothing is stored until you register.</span>
+    <form class="row g12" id="compat-form" hx-post="{{schemaURL .Subject}}/config" hx-disabled-elt="find button[type=submit]" data-mod-enter>
+      <div class="card grow sc-levels" role="radiogroup" aria-label="Compatibility level" style="--c: 24px 190px 1fr">
+        <div class="r h"><span></span><span>Level</span><span>What a new version must satisfy</span></div>
+        {{range .LevelRows}}<label class="r{{if .On}} on{{end}}" data-row title="{{teach "registry" .Level}}"><input type="radio" name="level" value="{{.Level}}" aria-label="{{.Level}}"{{if .On}} checked{{end}}><span class="m b">{{.Level}}{{if .Now}} <span class="tag">now</span>{{end}}</span><span class="el">{{.Says}}</span></label>{{end}}
+      </div>
+      <div class="col g8 sc-side-wide">
+        <div class="callout"><span class="b">Scope</span>
+          <div class="seg sc-seg" role="radiogroup" aria-label="Scope"><label class="on"><input type="radio" class="sr-only" name="scope" value="subject" checked>This subject</label><label><input type="radio" class="sr-only" name="scope" value="global">Global default</label></div>
+          <span class="note">A level on the subject wins over the global one. {{if .CompatOwn}}<button type="submit" class="linkbtn" name="level" value="default" formnovalidate>Remove it</button> to follow the global level ({{.GlobalLevel}}) again.{{else}}Remove it to follow the global level again.{{end}}</span></div>
+        <div class="callout"><span class="b">What changing it does</span><span class="note">Existing versions are not re-checked. The new level applies to the next register or compatibility check. Raising to a TRANSITIVE level can make a schema that passed today fail against v1.</span></div>
+        <div class="callout"><span class="b">Mode</span>
+          <div class="seg sc-seg" role="radiogroup" aria-label="Mode">{{range (list "READWRITE" "READONLY")}}<label{{if eq . $.Mode}} class="on"{{end}}><input type="radio" class="sr-only" name="mode" value="{{.}}"{{if eq . $.Mode}} checked{{end}}>{{.}}</label>{{end}}</div>
+          <span class="note">{{if .ModeOwn}}Set on this subject. {{end}}{{if ne .GlobalMode .Mode}}The global mode is {{.GlobalMode}}. {{end}}IMPORT is not supported here.</span></div>
       </div>
     </form>
+    <form class="card pad col g8" id="level-try" hx-post="{{schemaURL .Subject}}/level-check" hx-include="#compat-form" hx-target="#level-answer" hx-select="unset" hx-swap="innerHTML">
+      <div class="row sb ce"><span class="h2">Try it</span><span class="note">Same as <span class="m">PUT /config/{subject}</span></span></div>
+      <div class="row g8 ce"><span class="m grow" id="level-body">{"compatibility":"{{.Compat}}"}</span><button class="btn" type="submit">Test v{{.Latest}} against this level</button></div>
+      <div id="level-answer" aria-live="polite"></div>
+    </form>
+    {{else if eq .Tab "used"}}
+    {{if .Undecoded}}{{with index .Undecoded 0}}<div class="callout warn" role="status" id="undecoded-why">
+      <div class="row ce g8"><span class="b">Shown raw, not decoded</span><span class="m">40403</span><span class="mut">·</span><span class="m">schema id {{.ID}}</span></div>
+      <span class="m">{"error_code":40403,"message":"Schema {{.ID}} not found"}</span>
+      <span class="note">The message starts with magic byte 0 and id {{.ID}}, so a serializer wrote it against a registry that knew id {{.ID}}. This registry has {{idRanges $.IDsInUse}} only. Probably another broker's registry, or a data directory that was reset. The bytes are intact; only the decoding is missing.</span>
+    </div>{{end}}
+    <div class="row ce sb"><span class="h2">Messages that could not be decoded</span><span class="note">{{.UnknownCount}} of {{num .Framed}} on {{.UsedTopic}}</span></div>
+    <div class="card sc-pull" id="undecoded-table" style="--c: 40px 80px 150px 70px 1fr 140px">
+      <div class="r h"><span>Part.</span><span class="ra">Offset</span><span>Key</span><span>Id</span><span>Why</span><span>Open</span></div>
+      {{range $i, $u := .Undecoded}}<div class="r{{if eq $i 0}} on{{end}}" data-row tabindex="0" role="button" data-inspector-open hx-get="{{$u.URL}}" hx-trigger="click, keydown[key=='Enter'||key==' '] consume" hx-target="#inspector" hx-select="unset" hx-swap="innerHTML" aria-label="Open the message at p{{$u.Partition}} offset {{$u.Offset}}"><span class="m">p{{$u.Partition}}</span><span class="m ra">{{num $u.Offset}}</span><span class="m el">{{$u.Key}}</span><span class="m warn">{{$u.ID}}</span><span class="el">schema id {{$u.ID}} is not registered here (40403)</span><a class="m" href="{{$u.URL}}">message, raw</a></div>{{end}}
+    </div>
+    <div class="row g12">
+      <div class="callout grow"><span class="b">Bring the id back</span><span class="note">Register the schema that wrote it. Ids are handed out in order, so it will not get id {{(index .Undecoded 0).ID}} back; the message stays undecoded unless a registry hands that exact id out. Better: have the producer re-send it.</span></div>
+      <div class="callout grow"><span class="b">Consumers feel it too</span><span class="note">A deserializer using this registry fails on this offset with the same 40403 and stops its poll loop, unless it skips bad records.</span></div>
+    </div>
     {{else}}
-    <div class="card" id="versions-table" style="--c: 80px 70px minmax(0, 1fr)">
-      <div class="r h"><span>Version</span><span class="ra">Id</span><span>What changed</span></div>
+    <div class="row ce sb"><span class="h2">Which schema id the messages carry</span><span class="note">counted from the 5-byte header of {{if .Unread}}the newest {{num .Scanned}} messages{{else}}every message{{end}} on the {{if eq (len .UsedRows) 0}}topic{{else}}topics{{end}}</span></div>
+    {{if .UsedRows}}<div class="card sc-pull2" id="used-table" style="--c: 1fr 70px 60px 220px 90px 150px">
+      <div class="r h"><span>Topic</span><span>Position</span><span>Id</span><span>Share of messages</span><span class="ra">Messages</span><span>Open</span></div>
+      {{range $i, $r := .UsedRows}}<div class="r{{if eq $i 0}} on{{end}}" data-row><span class="m{{if $r.FirstOfTopic}} b{{else}} mut{{end}}">{{$r.Topic}}</span><span class="m{{if not $r.FirstOfTopic}} mut{{end}}">{{$r.Part}}</span><span class="m">{{$r.ID}} · v{{$r.Version}}</span><div class="row ce g8"><div class="lane grow" aria-hidden="true"><div{{if $r.Old}} class="kid"{{end}} style="width: {{printf "%.1f" $r.Share}}%"></div></div><span class="m">{{printf "%.1f" $r.Share}}%</span></div><span class="m ra">{{num $r.Count}}</span><a class="m" href="{{$r.OpenURL}}">{{$r.Open}}</a></div>{{end}}
+    </div>{{else}}<div class="callout" role="note"><span class="note">No message read on {{if .UsedTopic}}<span class="m">{{.UsedTopic}}</span>{{else}}any topic{{end}} carries one of this subject's ids.</span></div>{{end}}
+    <div class="row g12">
+      {{with .OldRow}}<div class="callout grow"><span class="b">Why {{num .Count}} {{if eq .Count 1}}is{{else}}are{{end}} still on v{{.Version}}</span><span class="note">They were produced while v{{.Version}} was the version the serializer used. They stay readable for as long as the topic keeps them, and decode with v{{.Version}}; nothing is wrong.</span></div>{{end}}
+      <div class="callout grow"><span class="b">Topics with no schema in front</span><span class="note">A topic is listed only if a message on it carries this subject's id. A topic whose messages carry no 5-byte header shows as plain JSON or raw on its own page.</span></div>
+    </div>
+    {{if .UsedTopic}}<form class="card pad col g8" id="open-id" method="get" action="{{schemaURL .Subject}}/open-id">
+      <div class="row sb ce"><span class="h2">Try it</span><span class="note">Open the newest message that carries a given id</span></div>
+      <div class="row g8 ce"><label class="note" for="idin">Schema id</label><input id="idin" class="inp m sc-idin" name="id" value="{{.LatestID}}" inputmode="numeric"><button class="btn" type="submit">Open on {{.UsedTopic}}</button></div>
+    </form>{{end}}
+    {{end}}
+    {{else if eq .Tab "raw"}}
+    <div class="row sb ce"><span class="note m">{{.RawPath}}</span><button type="button" class="btn sm" data-copy="{{.Raw}}" aria-label="Copy the answer">Copy</button></div>
+    <pre class="code sc-raw" id="raw">{{jsonTint .Raw}}</pre>
+    {{else}}
+    {{if .ByClient}}<div class="callout ok sc-client" role="status"><span class="b">Nobody registered this by hand</span><span class="note">A client's serializer sent this schema here{{with subjectTopic .Subject}}, the first time it produced to <span class="m">{{.}}</span>{{end}}. <span class="m">auto.register.schemas</span> is true by default in the Confluent serializers, so the subject appeared the moment the producer needed it.</span></div>{{end}}
+
+    <div class="card" id="versions-table" style="--c: {{if .ByClient}}70px 60px 1fr 180px 150px{{else}}70px 60px 1fr 150px 150px{{end}}">
+      <div class="r h"><span>Version</span><span class="ra">Id</span>{{if .ByClient}}<span>Schema</span><span>Registered</span><span>By</span>{{else}}<span>What changed</span><span>Registered</span><span>Checked against</span>{{end}}</div>
       {{range .VersionRows}}
-      <a class="r {{if eq .Version $.Cur.Version}}on{{end}}" href="{{schemaURL $.Subject}}?version={{.Version}}" data-row {{if eq .Version $.Cur.Version}}aria-current="true"{{end}}>
-        <span class="m b">v{{.Version}}{{if .Latest}} <span class="tag">latest</span>{{end}}</span>
+      <a class="r{{if .On}} on{{end}}" href="{{.URL}}" data-row{{if .On}} aria-current="true"{{end}}>
+        <span class="m b">v{{.Version}}{{if .Latest}} latest{{end}}</span>
         <span class="m ra">{{.ID}}</span>
-        <span class="el">{{.Changed}}</span>
+        {{if $.ByClient}}<span class="el m">{{.Shape}}</span>
+        <span class="m">{{if .At.IsZero}}<span class="mut">not kept</span>{{else}}{{when .At "clockms"}} today{{end}}</span>
+        <span class="m">{{.By}}</span>
+        {{else}}<span class="el">{{if .Changed}}{{changed .Changed}}{{else}}{{.Text}}{{end}}</span>
+        <span class="m">{{if .At.IsZero}}<span class="mut">not kept</span>{{else}}{{when .At "day"}}{{end}}</span>
+        <span class="m{{if not .Checked}} mut{{else if not .CheckedOK}} bad{{end}}">{{if .Checked}}{{.Checked}}{{else}}first{{end}}</span>{{end}}
       </a>
       {{end}}
     </div>
 
-    <div x-data="{view: '{{if .Prev}}changes{{else}}schema{{end}}'}" class="schema-view col g8">
-      <div class="row sb ce">
-        <div class="row ce g8"><span class="h2">Schema v{{.Cur.Version}}</span><span class="note">id {{.Cur.ID}}</span></div>
-        <div class="row ce g8">
-          <div class="seg fmt" role="group" aria-label="View">
-            {{if .Prev}}<button type="button" :class="view==='changes'&&'on'" :aria-pressed="view==='changes'" @click="view='changes'">Changes from v{{.Prev.Version}}</button>{{end}}
-            <button type="button" :class="view==='schema'&&'on'" :aria-pressed="view==='schema'" @click="view='schema'">Schema</button>
-          </div>
-          <button type="button" class="btn sm" data-copy="{{.Cur.Schema}}" aria-label="Copy the schema">Copy</button>
-        </div>
+    {{if .ByClient}}
+    <div class="row g12 sc-pair">
+      <pre class="code grow sc-text">{{jsonTint .Text}}</pre>
+      <div class="callout sc-client-note"><span class="b">Check what the client settled on</span><span class="note">The serializer built this schema from its own class. If it is not what you meant, register a corrected version here; {{.Compat}} then decides if it may follow.</span></div>
+    </div>
+    {{else if eq .Cur.Type "JSON"}}
+    <div class="row g12 sc-pair">
+      <div class="col grow g8">
+        <div class="row sb ce" id="schema-head"><div class="row ce g8"><span class="h2">Schema v{{.Cur.Version}}</span><span class="note">id {{.Cur.ID}}{{if .Shape.Draft}} · {{.Shape.Draft}}{{end}}</span></div><button type="button" class="btn sm" data-copy="{{.Cur.Schema}}" aria-label="Copy the schema">Copy</button></div>
+        <pre class="code sc-text">{{jsonTint .Text}}</pre>
       </div>
-      {{if .Prev}}
-      <div class="valuebox diff" x-show="view==='changes'" role="region" tabindex="0" aria-label="Changes from version {{.Prev.Version}}">{{if eq .Changed 0}}<span class="dim">No change to the text: only its formatting differs.</span>{{else}}{{range .Diff}}<div class="dl {{.Op}}"><span class="dm" aria-hidden="true">{{if eq .Op "add"}}+{{else if eq .Op "del"}}−{{else}} {{end}}</span><span class="dt">{{.Text}}</span></div>{{end}}{{end}}</div>
-      {{end}}
-      <pre class="code" x-show="view==='schema'" {{if .Prev}}x-cloak{{end}}>{{if eq .Cur.Type "PROTOBUF"}}{{.Text}}{{else}}{{jsonTint .Text}}{{end}}</pre>
+      {{if .Shape.Fields}}<div class="col g8 sc-props">
+        <span class="h2">Properties</span>
+        <div class="card" style="--c: 90px 76px 1fr">
+          <div class="r h"><span>Property</span><span>Required</span><span>Type</span></div>
+          {{range .Shape.Fields}}<div class="r"><span class="m b">{{.Name}}</span><span class="m{{if .Optional}} mut{{else}} ok{{end}}">{{if .Optional}}optional{{else}}required{{end}}</span><span class="m">{{.Type}}</span></div>{{end}}
+        </div>
+        <div class="callout"><span class="b">How the registry compares JSON Schema</span><span class="note">Keyword by keyword, naming each change ("maxLength decreased", "property added to an open content model"). {{if .Shape.Closed}}With <span class="m">additionalProperties</span> false this model is closed, so adding an optional property later is allowed. On an open object it would be refused, as in Confluent.{{else}}This object is open (other properties are allowed), so adding a property later is refused, as in Confluent; close it with <span class="m">additionalProperties</span> false to allow that.{{end}}</span></div>
+      </div>{{end}}
     </div>
-    {{if .Cur.References}}
-    <span class="h2">References</span>
-    <div class="card" style="--c: minmax(0, 1fr) minmax(0, 1.4fr)">
-      {{range .Cur.References}}<div class="r"><span class="m b">{{.Name}}</span><span class="m"><a href="{{schemaURL .Subject}}?version={{.Version}}">{{.Subject}}</a> v{{.Version}}</span></div>{{end}}
+    {{else}}
+    <div class="row sb ce" id="schema-head"><div class="row ce g8"><span class="h2">Schema v{{.Cur.Version}}</span><span class="note">id {{.Cur.ID}}{{if eq .Cur.Type "PROTOBUF"}} · printed in the registry's canonical form{{else if .Shape.Fields}} · {{len .Shape.Fields}} field{{if ne (len .Shape.Fields) 1}}s{{end}}{{end}}</span></div>
+      <div class="row g8">{{if .Prev}}<a class="btn sm w5" href="{{schemaURL .Subject}}/diff?from={{.Prev}}&to={{.Cur.Version}}" data-diff>Diff v{{.Prev}} to v{{.Cur.Version}}</a>{{end}}<button type="button" class="btn sm" data-copy="{{.Cur.Schema}}" aria-label="Copy the schema">Copy</button></div></div>
+    {{if eq .Cur.Type "PROTOBUF"}}
+    <div class="row g12 sc-pair">
+      <pre class="code grow sc-text">{{protoTint .Text}}</pre>
+      <div class="col g8 sc-side">
+        <div class="callout"><span class="b">Canonical form</span><span class="note">However a client sent it (<span class="m">.proto</span> text, or the base64 of a descriptor from confluent-kafka for Python), the registry stores and returns this one printing. Type names keep their leading dot where a descriptor had one. Comments are not kept.</span></div>
+        <div class="callout"><span class="b">What is compared</span><span class="note">Message and field declarations: wire-compatible type groups, labels, oneofs, names. Enums and services are not compared, as in Confluent.</span></div>
+      </div>
     </div>
+    {{else}}
+    <pre class="code sc-text sc-pull">{{jsonTint .Text}}</pre>
     {{end}}
     {{end}}
+
+    {{if not .ByClient}}
+    <form class="card pad col g8" id="try-it" hx-post="{{schemaURL .Subject}}/try" hx-target="#try-result" hx-select="unset" hx-swap="innerHTML">
+      <input type="hidden" name="version" value="{{.Cur.Version}}">
+      <div class="row sb ce"><span class="h2">Try it</span><span class="note">{{if eq .Cur.Type "JSON"}}Check a JSON document against v{{.Cur.Version}}{{else if eq .Cur.Type "PROTOBUF"}}Encode JSON with v{{.Cur.Version}} as a Protobuf message (magic byte, id {{.Cur.ID}}, message index 0, then fields){{else}}Encode JSON with v{{.Cur.Version}} and see the bytes a serializer would send{{end}}</span></div>
+      <div class="row g8 ce"><input class="inp m grow" name="doc" aria-label="JSON value" value="{{.TryDoc}}" spellcheck="false" autocomplete="off">
+        {{if eq .Cur.Type "JSON"}}<button class="btn" type="submit" name="do" value="check">Validate</button>
+        {{else}}<button class="btn" type="submit" name="do" value="encode">Encode</button>{{if eq .Cur.Type "AVRO"}}<button class="btn" type="submit" name="do" value="check">Check JSON against v{{.Cur.Version}}</button>{{end}}{{end}}
+        <span id="try-pill" class="try-pill"></span></div>
+      <div id="try-result" aria-live="polite"></div>
+    </form>
+    {{end}}
+    {{end}}
+    <div class="grow"></div>
   </main>
+  {{template "wire_dock" .}}
 {{template "shell_bottom" .}}{{end}}
 
-{{define "schema_check"}}
-{{if .Invalid}}{{template "refusal" .Invalid}}
-{{else if .OK}}<div class="callout ok" role="status"><span class="b">Compatible.</span><span class="note">This schema may be registered under the {{.Level}} rule.</span></div>
-{{else}}<div class="callout bad" role="alert"><span class="b">Not compatible with the {{.Level}} rule.</span>
-  <ul class="reasons">{{range .Reasons}}<li class="mono">{{.}}</li>{{end}}</ul></div>
+{{/* Sc-06: two versions compared. */}}
+{{define "schema_diff"}}{{template "shell_top" .}}
+  {{template "schema_lp" (dict "List" .List "Sel" .Sel)}}
+  <main class="main sc-main" id="detail">
+    <div class="backrow"><a class="btn sm" href="{{.BackURL}}" data-esc>‹&nbsp;Versions</a></div>
+    {{template "schema_band" .}}
+    <div class="row ce g8 wrap" id="diff-facts">
+      <span class="m">v{{.From.Version}} to v{{.To.Version}}</span><span class="mut">·</span>
+      <span class="m ok">{{.Added}} line{{if ne .Added 1}}s{{end}} added</span><span class="mut">·</span>
+      <span class="m bad">{{.Removed}} removed</span><span class="mut">·</span>
+      <span class="m warn">{{.ChangedLines}} line{{if ne .ChangedLines 1}}s{{end}} changed</span>
+      {{if .Allowed}}<span class="mut">·</span><span class="note">{{.Allowed}}</span>{{end}}
+    </div>
+    {{template "subject_neighbours" .}}
+    <nav class="tabs" aria-label="Subject tabs">
+      {{range .Tabs}}<a class="tab {{if .On}}on{{end}}" href="{{.URL}}"{{if .On}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+    </nav>
+    <div class="row sb ce">
+      <form class="row ce g8" method="get" action="{{schemaURL .Subject}}/diff" id="diff-pick">
+        <span class="h2">Compare</span>
+        <label class="row ce g6"><span class="note">from</span><select class="inp m sc-vsel" name="from" aria-label="From version" onchange="this.form.requestSubmit()">{{range .Versions}}<option value="{{.}}"{{if eq . $.From.Version}} selected{{end}}>v{{.}}</option>{{end}}</select></label>
+        <label class="row ce g6"><span class="note">to</span><select class="inp m sc-vsel" name="to" aria-label="To version" onchange="this.form.requestSubmit()">{{range .Versions}}<option value="{{.}}"{{if eq . $.To.Version}} selected{{end}}>v{{.}}</option>{{end}}</select></label>
+        {{if .Unified}}<input type="hidden" name="layout" value="unified">{{end}}
+        <noscript><button class="btn sm" type="submit">Compare</button></noscript>
+      </form>
+      <div class="seg" role="group" aria-label="Diff layout"><a href="{{.SideURL}}"{{if not .Unified}} class="on" aria-current="true"{{end}}>Side by side</a><a href="{{.UnifiedURL}}" data-unified{{if .Unified}} class="on" aria-current="true"{{end}}>Unified</a></div>
+      {{if .OlderURL}}<a href="{{.OlderURL}}" data-pair-older hidden>older pair</a>{{end}}{{if .NewerURL}}<a href="{{.NewerURL}}" data-pair-newer hidden>newer pair</a>{{end}}
+    </div>
+    {{if .Unified}}
+    <div class="card sc-diff" id="diff-table" style="--c: 36px 1fr">
+      <div class="r h"><span></span><span>v{{.From.Version}} to v{{.To.Version}}</span></div>
+      {{range .URows}}<div class="r dl-{{.UnifiedOp}}"><span class="m mut">{{.UnifiedN}}</span><span class="m">{{if eq .UnifiedOp "add"}}+ {{else if eq .UnifiedOp "del"}}- {{end}}{{.UnifiedText}}</span></div>{{end}}
+    </div>
+    {{else}}
+    <div class="card sc-diff" id="diff-table" style="--c: 36px 1fr 36px 1fr">
+      <div class="r h"><span></span><span>v{{.From.Version}} · id {{.From.ID}}{{if not .FromAt.IsZero}} · {{when .FromAt "day"}}{{end}}</span><span></span><span>v{{.To.Version}} · id {{.To.ID}}{{if not .ToAt.IsZero}} · {{when .ToAt "day"}}{{end}}</span></div>
+      {{range .Rows}}<div class="r">
+        <span class="m mut{{if eq .OldOp "del"}} dl-del bad{{else if eq .OldOp ""}} dl-none{{end}}">{{if .OldN}}{{.OldN}}{{end}}</span><span class="m{{if eq .OldOp "del"}} dl-del{{else if eq .OldOp ""}} mut dl-none{{end}}">{{if eq .OldOp "del"}}- {{end}}{{.Old}}</span>
+        <span class="m mut{{if eq .NewOp "add"}} dl-add{{else if eq .NewOp ""}} dl-none{{end}}">{{if .NewN}}{{.NewN}}{{end}}</span><span class="m{{if eq .NewOp "add"}} dl-add{{else if eq .NewOp ""}} mut dl-none{{end}}">{{if eq .NewOp "add"}}+ {{end}}{{.New}}</span>
+      </div>{{end}}
+    </div>
+    {{end}}
+    <div class="row g12">
+      <div class="callout{{if .Own.Compatible}} ok{{end}} grow"><span class="b">What this means for readers</span><span class="note">{{.Meaning}}</span></div>
+      {{if .Others}}<div class="callout grow"><span class="b">Check this change at another level</span><span class="note">{{.Others}}</span></div>{{end}}
+    </div>
+    <div class="grow"></div>
+  </main>
+  {{template "wire_dock" .}}
+{{template "shell_bottom" .}}{{end}}
+
+{{/* Sc-09's "Test vN against this level". */}}
+{{define "schema_level_check"}}
+{{if .Alone}}<div class="callout" role="status"><span class="note">v{{.Latest}} is the only version: there is nothing to check it against.</span></div>
+{{else if .OK}}<div class="callout ok" role="status"><div class="row ce g8"><span class="b ok">Passes</span><span class="m">v{{.Latest}} against {{range $i, $v := .Compared}}{{if $i}}, {{end}}v{{$v}}{{end}} at {{.Level}}</span></div><span class="note">Nothing is saved: the level is what the form says until Save level.</span></div>
+{{else}}<div class="callout bad" role="alert"><div class="row ce g8"><span class="b">Would fail</span><span class="m">v{{.Latest}} at {{.Level}}</span></div><span class="note">{{.Why}}. Existing versions are not re-checked when the level changes; the next register is.</span></div>
 {{end}}
 {{end}}
+
+{{/* Sc-13: the registry refused the console (401). */}}
+{{define "schemas_denied"}}{{template "shell_top" .}}
+  <aside class="list" aria-label="Subjects">
+    <div class="list-filter list-filter-first"><input class="inp m" type="search" placeholder="Filter subjects" aria-label="Filter Schemas" disabled></div>
+    <div class="col g4 list-none sc-off-none"><span class="b">Subjects not loaded</span><span class="note">The registry answered 401, so there is no list to show. This is not an empty registry; it does not say what it holds to a caller it refuses.</span></div>
+  </aside>
+  <main class="main sc-main" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Schemas</h1><span class="note">The {{if $.RegistryHost}}registry at <span class="m">{{.RegistryHost}}</span>{{else}}registry{{end}} is up and wants a user name and password.</span></div>
+      <div class="row g8 ce idband-acts"><a class="btn pri w5" href="{{prefix}}/schemas" data-retry-page>Try again</a></div>
+    </div>
+    <div class="callout deny" role="alert" data-refusal-kind="refused" data-refusal-source="registry" data-refusal-name="401">
+      <div class="row ce g8"><span class="b">Refused</span><span class="m">401 Unauthorized</span></div>
+      <span class="m sc-wrap">{{.Raw}}</span>
+      <span class="note">Rule: {{if .SASL}}SASL is on, so the registry requires HTTP basic authentication with the same user names and passwords as the broker.{{else}}the registry requires HTTP basic authentication.{{end}} A Confluent registry set up for basic auth refuses an unauthenticated or wrong-password call the same way. Nothing was changed.</span>
+    </div>
+    <div class="row g12">
+      <div class="card grow"><div class="pad col g8">
+        <span class="h2">The console's own sign-in</span>
+        <span class="note">{{if .User}}The console signs in to the registry as <span class="m">{{.User}}</span>, the user it reaches the broker as, and the registry refused it: the user may have been removed, or its password changed, since the broker started.{{else}}The console sent no user: the broker has SASL off, and this registry wants one.{{end}} It asks for no other.</span>
+        <div class="row g8"><a class="btn pri w5" href="{{prefix}}/schemas">Try again</a><a class="btn w5" href="{{prefix}}/access">Open Access to see the users</a></div>
+      </div></div>
+      <div class="col g8 sc-denied-side">
+        <div class="callout"><span class="b">If the refused call came from an app</span><span class="note">Give the serializer the same credentials it gives the broker.</span>
+          <pre class="code sc-snip"><span class="kw">schema.registry.url</span>={{.RegistryURL}}
+basic.auth.credentials.source=USER_INFO
+basic.auth.user.info={{.AppUser}}:&lt;password&gt;</pre></div>
+        <div class="callout"><span class="b">Check the same thing by hand</span><pre class="code sc-snip">curl -u {{.AppUser}}:&lt;password&gt; \
+  {{.RegistryURL}}/subjects</pre></div>
+      </div>
+    </div>
+    <div class="grow"></div>
+  </main>
+  {{template "wire_dock" .}}
+{{template "shell_bottom" .}}{{end}}
+
+{{/* Sc-16: a subject the registry does not have. */}}
+{{define "schema_notfound"}}{{template "shell_top" .}}
+  {{template "schema_lp" (dict "List" .List "Sel" "" "Near" .Near)}}
+  <main class="main sc-none-main" id="detail">
+    <div class="row sb ce idband">
+      <div class="col"><h1 class="h1">Schemas</h1><span class="note">No subject called <span class="m">{{.Subject}}</span>. The registry has {{.Others}} other{{if ne .Others 1}}s{{end}}.</span></div>
+      <div class="row g8 ce idband-acts">{{if .Close}}{{with index .Close 0}}<a class="btn pri w5" href="{{schemaURL .Name}}" data-closest>Open {{.Name}}</a>{{end}}{{else}}<a class="btn pri w5" href="{{.RegisterURL}}">Register {{.Subject}}</a>{{end}}</div>
+    </div>
+    <div class="callout deny" role="alert" data-refusal-kind="refused" data-refusal-source="registry" data-refusal-name="{{.Code}}">
+      <div class="row ce g8"><span class="b">Not found</span><span class="m">{{.Code}}</span><span class="mut">·</span><span class="m">HTTP 404</span></div>
+      <span class="m sc-wrap">{{.Raw}}</span>
+      <span class="note">Rule: the subject has no versions, or it was soft deleted. Nothing is wrong with the registry. A real Confluent registry answers <span class="m">GET /subjects/{{.Subject}}/versions</span> with the same status and code.</span>
+    </div>
+    {{if .Close}}<div class="card pad col g8" id="did-you-mean">
+      <span class="h2">Did you mean</span>
+      <div class="card" style="--c: 1fr 80px 70px 120px">
+        <div class="r h"><span>Subject</span><span>Type</span><span class="ra">Versions</span><span></span></div>
+        {{range $i, $s := .Close}}<div class="r{{if eq $i 0}} on{{end}}" data-row><span class="m b">{{$s.Name}}</span><span class="m">{{$s.TypeName}}</span><span class="m ra">{{$s.Versions}}</span><a class="btn sm w5" href="{{schemaURL $s.Name}}">Open</a></div>{{end}}
+      </div>
+      <span class="note">Matched on the name you asked for: {{.Why}} Suggestions are the registry's own subjects, nothing else.</span>
+    </div>{{end}}
+    <div class="row g12">
+      <div class="callout grow"><span class="b">Was it deleted?</span><span class="note">{{if .SoftDeleted}}Yes: <span class="m">{{.Subject}}</span> is soft-deleted. It is listed under Soft-deleted on <a href="{{prefix}}/schemas">Schemas</a>, where it can be deleted for good.{{else}}A soft deleted subject answers 40401 until it is registered again. Look for it with <span class="m">GET /subjects?deleted=true</span>.{{end}}</span></div>
+      <div class="callout grow"><span class="b">Or is it just not registered yet</span><span class="note">A serializer registers its subject on first produce. Make the name here by hand if you want to try the rules first.</span><a class="btn w5 sc-reg-it" href="{{.RegisterURL}}">Register {{.Subject}}</a></div>
+    </div>
+    <div class="grow"></div>
+  </main>
+  {{template "wire_dock" .}}
+{{template "shell_bottom" .}}{{end}}
+
+{{/* Try it's answer: the bytes, or why the value does not fit. */}}
+{{define "schema_try"}}
+{{/* A check's verdict is the pill beside the buttons (Sc-08); why it failed, and what
+     an encode made, go under them. */}}
+<span id="try-pill" class="try-pill" hx-swap-oob="true">{{if eq .Do "check"}}{{if .Err}}<span class="pill bad" role="status">not valid</span>{{else}}<span class="pill ok" role="status">valid</span>{{end}}{{end}}</span>
+{{if .Err}}<div class="callout bad" role="alert"><span class="b">{{if eq .Do "check"}}Does not fit v{{.Version}}{{else}}Not encoded{{end}}</span><span class="note m">{{.Err}}</span></div>
+{{else if eq .Do "check"}}
+{{else}}<div class="col g4" role="status"><span class="note">{{.Len}} bytes: magic byte 0, id {{.ID}} (4 bytes), then the value.</span><pre class="code sc-bytes">{{.Bytes}}</pre></div>
+{{end}}
+{{end}}
+
+

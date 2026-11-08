@@ -1,0 +1,65 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/big/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"string\\\",\\\"doc\\\":\\\"@PAD(1048576)\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/big/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"string\\\",\\\"doc\\\":\\\"@PAD(9437184)\\\"}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/big/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"string\\\",\\\"doc\\\":\\\"@PAD(20971520)\\\"}\"}",
+    "status": 400,
+    "response": {
+      "error_code": 400,
+      "message": "String value length (20054016) exceeds the maximum allowed (20000000, from `getMaxStringLength()`)"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/big",
+    "body": "{\"compatibility\":\"FULL\",\"pad\":\"@PAD(1048576)\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "FULL"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/big",
+    "body": "{\"compatibility\":\"FULL\",\"pad\":\"@PAD(20971520)\"}",
+    "status": 200,
+    "response": {
+      "compatibility": "FULL"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/big",
+    "body": "{\"mode\":\"READWRITE\",\"pad\":\"@PAD(20971520)\"}",
+    "status": 200,
+    "response": {
+      "mode": "READWRITE"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/subjects/big/versions",
+    "status": 200,
+    "response": [
+      1
+    ]
+  }
+]

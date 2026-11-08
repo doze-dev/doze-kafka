@@ -70,6 +70,7 @@ func TestEverySelectionRendersThroughTheInspectorContract(t *testing.T) {
 		{KindClient, "/_console/inspect/client?key=1", "billing", "client:1", []string{"apache-kafka-java 3.7.0", "billing-workers", "Its requests"}},
 		{KindMember, "/_console/inspect/member?key=" + url.QueryEscape(joinKey("billing", memberID)), "billing-service", "member:" + joinKey("billing", memberID), []string{"Assignment", "Subscription", "orders", "0–1"}},
 		{KindSubject, "/_console/inspect/subject?key=orders-value", "orders-value", "subject:orders-value", []string{"Compatibility", "Avro"}},
+		{KindVersion, "/_console/inspect/version?key=" + url.QueryEscape(joinKey("orders-value", "1")), "orders-value v1", "version:" + joinKey("orders-value", "1"), []string{"Schema id", "(global)", "Same schema in", "no other subject", "On the wire", "Messages on this id"}},
 		{KindTransaction, "/_console/inspect/transaction?key=inspect-txn", "inspect-txn", "transaction:inspect-txn", []string{"tx-0", "Ongoing"}},
 		{KindEvent, "/_console/inspect/event?key=" + url.QueryEscape(joinKey("billing-workers", "3")), "session expired", "event:" + joinKey("billing-workers", "3"), []string{"no heartbeat within its session timeout"}},
 		{KindACL, "/_console/inspect/acl?key=" + url.QueryEscape(aclKey), "DENY User:audit Read", "acl:" + aclKey, []string{"Refuses every request that needs Read on this topic by User:audit", "It is the only ACL about it", "Check a request"}},
@@ -122,13 +123,15 @@ func TestEverySelectionRendersThroughTheInspectorContract(t *testing.T) {
 	}
 	// What cannot be a selection is refused, in the shell's own words.
 	for path, code := range map[string]int{
-		"/_console/inspect/nonsense?key=1":       404,
-		"/_console/inspect/client?key=abc":       400,
-		"/_console/inspect/member?key=one-part":  400,
-		"/_console/inspect/event?key=g%3Aabc":    400,
-		"/_console/inspect/subject?key=no-such":  404,
-		"/_console/inspect/transaction":          400,
-		"/_console/topics/orders/message?offset": 400,
+		"/_console/inspect/nonsense?key=1":               404,
+		"/_console/inspect/client?key=abc":               400,
+		"/_console/inspect/member?key=one-part":          400,
+		"/_console/inspect/event?key=g%3Aabc":            400,
+		"/_console/inspect/subject?key=no-such":          404,
+		"/_console/inspect/version?key=nope":             400,
+		"/_console/inspect/version?key=orders-value%3A0": 400,
+		"/_console/inspect/transaction":                  400,
+		"/_console/topics/orders/message?offset":         400,
 	} {
 		if rec := req(t, c, "GET", path, nil); rec.Code != code {
 			t.Errorf("%s answered %d, want %d", path, rec.Code, code)

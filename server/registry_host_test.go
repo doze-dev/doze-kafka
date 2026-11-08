@@ -1,9 +1,11 @@
 package server_test
 
 import (
+	"github.com/doze-dev/doze-kafka/internal/storage/meta"
 	"io"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -238,5 +240,67 @@ func TestTheRegistryRefusesAForeignHostBeforeAskingForCredentials(t *testing.T) 
 	}
 	if a := askRegistry(t, addr, "GET", "/subjects", addr, "", "alice", "secret"); a.code != 200 || a.body != "[]" {
 		t.Errorf("the registry's own Host with the right credentials = %d %s, want 200 [] (the refused POST registered nothing)", a.code, a.body)
+	}
+}
+
+// Server.SchemaRegistry hands out one registry: two handlers from it are the same
+// store, so a schema registered through one has the same id through the other and
+// the two never give one id to different schemas. (SCH-12)
+func TestSchemaRegistryIsOneInstance(t *testing.T) {
+	srv := mustNew(t, server.Options{})
+	defer srv.Close()
+	a, b := registryOf(t, srv), registryOf(t, srv)
+	other := `{"schema":"{\"type\":\"record\",\"name\":\"Other\",\"fields\":[{\"name\":\"n\",\"type\":\"string\"}]}"}`
+	first := askRegistry(t, a, http.MethodPost, "/subjects/orders-value/versions", "127.0.0.1", orderSchema)
+	second := askRegistry(t, b, http.MethodPost, "/subjects/other-value/versions", "127.0.0.1", other)
+	if first.code != 200 || second.code != 200 {
+		t.Fatalf("register: %d %s; %d %s", first.code, first.body, second.code, second.body)
+	}
+	if first.body == second.body {
+		t.Errorf("two different schemas got the same answer %s", first.body)
+	}
+	if got := askRegistry(t, b, http.MethodGet, "/subjects", "127.0.0.1", ""); !strings.Contains(got.body, "orders-value") {
+		t.Errorf("the second handler does not see what the first registered: %s", got.body)
+	}
+}
+
+// With SASL on, the registry asks for the broker's users as HTTP basic credentials, on
+// every route including / and one that does not exist, whatever SASL mechanisms the
+// broker offers: a SCRAM-only broker's user signs in with the same password. (SCH-27)
+func TestSchemaRegistryAuthWiring(t *testing.T) {
+	srv := mustNew(t, server.Options{SASLMechanisms: []string{"SCRAM-SHA-256"}, Credentials: map[string]string{"alice": "alice-secret"}})
+	defer srv.Close()
+	addr := registryOf(t, srv)
+	for _, path := range []string{"/", "/subjects", "/no/such/route"} {
+		for _, creds := range [][]string{nil, {"alice", "wrong"}, {"mallory", "alice-secret"}} {
+			if got := askRegistry(t, addr, http.MethodGet, path, "127.0.0.1", "", creds...); got.code != 401 || got.challenge == "" {
+				t.Errorf("GET %s as %v: %d %q, want 401 with a challenge", path, creds, got.code, got.challenge)
+			}
+		}
+	}
+	if got := askRegistry(t, addr, http.MethodGet, "/subjects", "127.0.0.1", "", "alice", "alice-secret"); got.code != 200 {
+		t.Errorf("GET /subjects as alice: %d %s", got.code, got.body)
+	}
+	if got := askRegistry(t, addr, http.MethodGet, "/no/such/route", "127.0.0.1", "", "alice", "alice-secret"); got.code != 404 {
+		t.Errorf("an unknown route as alice: %d, want 404", got.code)
+	}
+}
+
+// A registry record that cannot be read is SchemaRegistry's error, naming it; the
+// broker is not affected (cmd/doze-kafka starts without the registry then). (SCH-13)
+func TestSchemaRegistryWithAnUnreadableRecord(t *testing.T) {
+	dir := t.TempDir()
+	st, err := meta.Open(filepath.Join(dir, config.MetaDBFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RegistryApply(map[string][]byte{"schema\x000000000001": []byte("not json")}, nil); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	srv := mustNew(t, server.Options{DataDir: dir})
+	defer srv.Close()
+	if _, err := srv.SchemaRegistry(); err == nil || !strings.Contains(err.Error(), "0000000001") {
+		t.Errorf("SchemaRegistry over an unreadable record: %v", err)
 	}
 }

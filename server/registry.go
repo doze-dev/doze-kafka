@@ -59,7 +59,15 @@ func registryHosts(cfg config.Config) []string {
 // a name under .doze, or Options.AdvertisedHost; any other gets 403 (the defence
 // against DNS rebinding from a web page). Serve it under another name by setting
 // AdvertisedHost to that name.
+//
+// Every call returns the same handler: one registry over one store, so two
+// listeners serving it agree on every id.
 func (s *Server) SchemaRegistry() (http.Handler, error) {
+	s.regMu.Lock()
+	defer s.regMu.Unlock()
+	if s.reg != nil {
+		return s.reg, nil
+	}
 	reg, err := schemaregistry.Open(metaStorage{s.meta})
 	if err != nil {
 		return nil, err
@@ -72,5 +80,6 @@ func (s *Server) SchemaRegistry() (http.Handler, error) {
 			return ok && subtle.ConstantTimeCompare([]byte(want), []byte(pass)) == 1
 		}
 	}
-	return schemaregistry.NewAPI(reg, opts), nil
+	s.reg = schemaregistry.NewAPI(reg, opts)
+	return s.reg, nil
 }

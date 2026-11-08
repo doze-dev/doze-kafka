@@ -27,6 +27,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -157,6 +158,9 @@ type Server struct {
 
 	ready     chan struct{} // closed once the listener is bound, or the server has ended without one.
 	readyOnce sync.Once
+
+	regMu sync.Mutex
+	reg   http.Handler // the schema registry SchemaRegistry hands out; nil until the first call.
 }
 
 // New validates the options and opens storage + broker + router. It does not

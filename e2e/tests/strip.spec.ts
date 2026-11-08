@@ -33,7 +33,7 @@ test.afterAll(() => { hold?.kill('SIGTERM'); });
 
 const PAGES = [
   '', 'topics', 'topics/seed-orders', 'topics/seed-orders?tab=partitions', 'topics/seed-orders?tab=config',
-  'groups', 'groups/g-lag', 'groups/g-lag?tab=offsets', 'groups/strip-hold-group?tab=members', 'schemas', 'schemas/seed-events-value',
+  'groups', 'groups/g-lag', 'groups/g-lag?tab=offsets', 'groups/strip-hold-group?tab=members', 'schemas', 'schemas/seed-events-value', 'schemas/seed-events-value?tab=used',
   'trace', 'traffic', 'traffic?view=clients', 'access', 'access/check?principal=User:ANONYMOUS&operation=read&resource=topic&name=seed-orders',
   'new/acl', 'cluster', 'connect', 'new/topic', 'new/schema',
 ];
@@ -86,6 +86,7 @@ async function opens(page: Page, path: string) {
 async function effect(page: Page, path: string, h: Hint) {
   const where = `${path}: ${h.keys.join(' ')} ${h.label}`;
   switch (h.label) {
+    case 'version':
     case 'move': {
       // A list fills its rows from a poll: a j typed before they are there moves nothing,
       // and the cursor never comes. Wait for a row, as the page's own user would.
@@ -103,18 +104,27 @@ async function effect(page: Page, path: string, h: Hint) {
       return;
     }
     case 'tabs': {
-      // 1 to 4 are the tabs by number: 2 is the second tab, which is the Members tab.
+      // 1 to 4 are the tabs by number: 2 is the second tab, a group's Members tab and a
+      // subject's Compatibility tab.
       await press(page, ['2']);
-      await expect(page, where).toHaveURL(/[?&]tab=members/);
+      await expect(page, where).toHaveURL(path.startsWith('schemas/') ? /[?&]tab=compat/ : /[?&]tab=members/);
       await press(page, ['1']);
       await expect(page, where).not.toHaveURL(/[?&]tab=/);
       return;
     }
+    case 'diff with previous':
+      await press(page, ['d']);
+      await expect(page, where).toHaveURL(/\/diff\?from=\d+&to=\d+/);
+      return;
+    case 'register new version':
+      await press(page, ['n']);
+      await expect(page, where).toHaveURL(/\/new\/schema\?subject=/);
+      return;
     case 'reset offsets':
       await press(page, ['r']);
       await expect(page, where).toHaveURL(/[?&]tab=offsets#reset/);
       return;
-    case 'open': case 'open subject': case 'open client': case 'open member': case 'follow':
+    case 'open': case 'open subject': case 'open client': case 'open member': case 'follow': case 'open messages': case 'open message':
       return opens(page, where);
     case 'close panel': case 'close':
       await opens(page, where);
@@ -161,6 +171,13 @@ async function effect(page: Page, path: string, h: Hint) {
       return;
     }
     case 'check':
+      if (path.startsWith('new/schema')) {
+        // Nothing is filled in: checking asks the browser to check the form first, which
+        // puts the focus on the subject it lacks. It sends nothing.
+        await press(page, ['⌘↵']);
+        await expect(page.locator('#f-subject'), where).toBeFocused();
+        return;
+      }
       await press(page, ['↵']);
       await expect(page, where).toHaveURL(/\/access\/check\?/);
       await expect(page.locator('#check-answer'), where).toBeVisible();
@@ -207,10 +224,19 @@ async function effect(page: Page, path: string, h: Hint) {
       await press(page, h.keys);
       await expect(page, where).toHaveURL(SECTION[h.label]);
       return;
+    case 'register':
+      // Nothing is checked yet, so Register is off (Sc-02) and the key does nothing.
+      await expect(page.locator('#reg-acts [data-register]'), where).toBeDisabled();
+      await press(page, ['ControlOrMeta+Shift+Enter']);
+      await expect(page.locator('#reg-answer'), where).toContainText('Not checked yet');
+      await expect(page, where).toHaveURL(/\/new\/schema$/);
+      return;
     case 'cancel':
       if (await page.locator('main [data-esc]').count()) {
+        const back = await page.locator('main [data-esc]').first().getAttribute('href');
+        await page.locator('body').click({ position: { x: 1, y: 1 } }); // out of the form's fields
         await press(page, ['esc']);
-        await expect(page, where).toHaveURL(/\/access$/);
+        await expect(page, where).toHaveURL(new RegExp(`${(back ?? '').replace(/[.?]/g, '\\$&')}$`));
       }
       return; // a confirm's own cancel: confirms.spec and keys.spec press it.
     case 'move between buttons': case 'press the focused button':

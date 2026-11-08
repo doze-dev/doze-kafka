@@ -126,7 +126,9 @@ func TestTheNeighboursSentenceRendersFromTheGraph(t *testing.T) {
 		t.Errorf("the group's sentence: %s", s)
 	}
 	sub := req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String()
-	if s := between(sub, `id="neighbours"`, `</div>`); !strings.Contains(s, "describes topic") || !strings.Contains(s, `href="/_console/topics/orders"`) {
+	// Sc-05's band: the topic it is named for, and the group that reads that topic.
+	if s := between(sub, `id="neighbours"`, `<nav`); !strings.Contains(s, "value schema") || !strings.Contains(s, `href="/_console/topics/orders"`) ||
+		!strings.Contains(s, `href="/_console/groups/g-order-validator"`) || !strings.Contains(s, "reads it") {
 		t.Errorf("the subject's sentence: %s", s)
 	}
 }

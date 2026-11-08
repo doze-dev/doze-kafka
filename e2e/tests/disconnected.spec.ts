@@ -146,7 +146,7 @@ test('every kind of page says the broker is gone, and comes back, without a relo
   });
   hold.kill('SIGTERM'); // its committed offsets keep the group; its page is what is wanted.
   const kinds = ['traffic', 'traffic?view=clients', 'trace', 'topics', `topics/${topic}`, `topics/${topic}?tab=partitions`, `topics/${topic}?tab=config`,
-    'groups', `groups/${topic}-group`, `groups/${topic}-group?tab=members`, 'groups/nobody-here', 'topics/nothing-here', 'schemas', 'new/schema',
+    'groups', `groups/${topic}-group`, `groups/${topic}-group?tab=members`, 'groups/nobody-here', 'topics/nothing-here', 'schemas', 'new/schema', 'schemas/nobody-value',
     'access', 'cluster', 'cluster?view=transactions', 'connect', 'new/topic', ''];
   const pages = [];
   const errors: string[] = [];

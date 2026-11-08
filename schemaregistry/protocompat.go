@@ -65,35 +65,65 @@ func (d *protoDiff) add(typ, path, text string) {
 
 // protoCanRead: a reader of `reader` reads what a writer of `writer` wrote when
 // going from writer to reader changes nothing incompatibly.
-func protoCanRead(reader, writer *protoSchema) []string {
+//
+// The sentences below are written with the reader as the new schema; when the reader
+// is the old one (a FORWARD check) the two are named the other way round, as
+// Confluent names them (recorded: testdata/compat/protobuf-reasons.json).
+func protoCanRead(reader, writer *protoSchema, readerIs, writerIs string) []CompatReason {
 	d := &protoDiff{oldFile: writer.file, newFile: reader.file}
 	d.compareFiles(writer.file, reader.file)
-	var out []string
+	names := strings.NewReplacer("new schema", readerIs+" schema", "old schema", writerIs+" schema")
+	var out []CompatReason
 	for _, c := range d.changes {
-		out = append(out, fmt.Sprintf("{errorType:\"%s\", description:\"%s\"}", c.typ, c.text))
+		text := c.text
+		if t, ok := protoSentences[c.typ]; ok {
+			// A nested message's name is a path: #/O/I, not #/O.I.
+			path := strings.ReplaceAll(c.path, ".", "/")
+			if path == "#" {
+				path = "#/"
+			}
+			text = fmt.Sprintf(t, path)
+		}
+		desc := names.Replace(text)
+		out = append(out, CompatReason{Type: c.typ, Path: strings.ReplaceAll(c.path, ".", "/"), Description: desc,
+			Text: fmt.Sprintf("{errorType:\"%s\", description:\"%s\"}", c.typ, desc)})
 	}
 	return out
+}
+
+// protoSentences are Confluent's descriptions by change type, the reader's schema
+// written as the new one (recorded: testdata/compat/protobuf-reasons.json).
+var protoSentences = map[string]string{
+	"FIELD_KIND_CHANGED":             "The type of a field at path '%s' in the new schema does not match the old schema",
+	"FIELD_MOVED_TO_EXISTING_ONEOF":  "A field in the oneof at path '%s' in the new schema is outside an existing oneof in the old schema",
+	"FIELD_NAMED_TYPE_CHANGED":       "The type of a MESSAGE field at path '%s' in the new schema does not match its type in the old schema",
+	"FIELD_NUMERIC_LABEL_CHANGED":    "The label for a NUMERIC field at path '%s' in the new schema does not match its label in the old schema",
+	"FIELD_SCALAR_KIND_CHANGED":      "The kind of a SCALAR field at path '%s' in the new schema does not match its kind in the old schema",
+	"MESSAGE_REMOVED":                "The new schema is missing a MESSAGE type at path '%s' in the old schema",
+	"MULTIPLE_FIELDS_MOVED_TO_ONEOF": "Multiple fields in the oneof at path '%s' in the new schema are outside a oneof in the old schema",
+	"ONEOF_FIELD_REMOVED":            "The new schema is missing a oneof field at path '%s' in the old schema",
+	"PACKAGE_CHANGED":                "The package at '%s' in the new schema does not match the package in the old schema",
+	"REQUIRED_FIELD_ADDED":           "A required field  at path '%s' in the new schema is missing in the old schema",
+	"REQUIRED_FIELD_REMOVED":         "The new schema is missing a required field at path: '%s' in the old schema",
 }
 
 func (d *protoDiff) compareFiles(o, u protoreflect.FileDescriptor) {
 	if o.Package() != u.Package() {
 		d.add("PACKAGE_CHANGED", "#", "The package name in the new schema does not match its name in the old schema")
 	}
+	// By name, so a message's own fields come before what is missing among the
+	// messages nested in it (recorded: "nested message moved").
 	om, um := messagesOf(o), messagesOf(u)
-	names := sortedKeys(om)
-	for _, name := range names {
-		if _, ok := um[name]; !ok {
+	for _, name := range sortedKeys(om) {
+		if nm, ok := um[name]; ok {
+			d.compareMessages(name, om[name], nm)
+		} else {
 			d.add("MESSAGE_REMOVED", "#/"+name, fmt.Sprintf("The message '%s' in the old schema is missing from the new schema", name))
 		}
 	}
 	for _, name := range sortedKeys(um) {
 		if _, ok := om[name]; !ok {
 			d.add("MESSAGE_ADDED", "#/"+name, "")
-		}
-	}
-	for _, name := range names {
-		if nm, ok := um[name]; ok {
-			d.compareMessages(name, om[name], nm)
 		}
 	}
 }
@@ -156,6 +186,15 @@ func label(f protoreflect.FieldDescriptor) string {
 	return ""
 }
 
+// fieldPath is where Confluent says a field is: its message, its oneof if it is in
+// one, and its number (recorded: "random 283", #/M/o/5).
+func fieldPath(message string, f protoreflect.FieldDescriptor) string {
+	if one := f.ContainingOneof(); one != nil && !one.IsSynthetic() {
+		return fmt.Sprintf("#/%s/%s/%d", message, one.Name(), f.Number())
+	}
+	return fmt.Sprintf("#/%s/%d", message, f.Number())
+}
+
 func (d *protoDiff) compareMessages(name string, o, u protoreflect.MessageDescriptor) {
 	of, uf := fieldsByNumber(o), fieldsByNumber(u)
 	nums := make([]int, 0, len(of))
@@ -165,9 +204,12 @@ func (d *protoDiff) compareMessages(name string, o, u protoreflect.MessageDescri
 	sort.Ints(nums)
 	for _, n := range nums {
 		num := protoreflect.FieldNumber(n)
-		path := fmt.Sprintf("#/%s/%d", name, n)
 		of1 := of[num]
 		uf1, ok := uf[num]
+		path := fieldPath(name, of1)
+		if ok && fieldPath(name, of1) == fmt.Sprintf("#/%s/%d", name, n) {
+			path = fieldPath(name, uf1) // in a oneof on the new side only
+		}
 		if !ok {
 			if label(of1) == "required" {
 				d.add("REQUIRED_FIELD_REMOVED", path, "A required field in the old schema is missing from the new schema")
@@ -187,7 +229,7 @@ func (d *protoDiff) compareMessages(name string, o, u protoreflect.MessageDescri
 	sort.Ints(unums)
 	for _, n := range unums {
 		f := uf[protoreflect.FieldNumber(n)]
-		path := fmt.Sprintf("#/%s/%d", name, n)
+		path := fieldPath(name, f)
 		if label(f) == "required" {
 			d.add("REQUIRED_FIELD_ADDED", path, "A required field was added in the new schema")
 		} else {
@@ -250,7 +292,7 @@ func (d *protoDiff) compareMessages(name string, o, u protoreflect.MessageDescri
 		for j := 0; j < on.Fields().Len(); j++ {
 			f := on.Fields().Get(j)
 			if !inNew[f.Number()] {
-				d.add("ONEOF_FIELD_REMOVED", fmt.Sprintf("#/%s/%d", name, f.Number()), "A field of a oneof in the old schema is missing from the same oneof in the new schema")
+				d.add("ONEOF_FIELD_REMOVED", fmt.Sprintf("#/%s/%s/%d", name, on.Name(), f.Number()), "A field of a oneof in the old schema is missing from the same oneof in the new schema")
 			}
 		}
 	}
@@ -280,17 +322,28 @@ func (d *protoDiff) compareFields(path string, o, u protoreflect.FieldDescriptor
 		}
 		return false
 	}
-	if ol != "" && ul != "" && ol != ul && !(ol != "required" && ul != "required" && lengthDelimited(o) && lengthDelimited(u)) {
-		d.add("FIELD_LABEL_CHANGED", path, "The label of a field in the new schema does not match its label in the old schema")
-	}
+	// The kind first: a field whose kind changed is reported for that alone
+	// (recorded: "random 003").
+	before := len(d.changes)
 	switch {
 	case o.IsMap() != u.IsMap():
-		d.add("FIELD_KIND_CHANGED", path, "The kind of a field at path '"+path+"' in the new schema does not match its kind in the old schema")
+		d.add("FIELD_KIND_CHANGED", path, "")
 	case o.IsMap():
-		d.compareMapParts(path+"/key", o.MapKey(), u.MapKey())
-		d.compareMapParts(path+"/value", o.MapValue(), u.MapValue())
+		// A map's key and value are reported at the map field (recorded: "map key type").
+		d.compareMapParts(path, o.MapKey(), u.MapKey())
+		d.compareMapParts(path, o.MapValue(), u.MapValue())
 	default:
 		d.compareKinds(path, o, u)
+	}
+	if len(d.changes) > before {
+		return
+	}
+	if ol != "" && ul != "" && ol != ul && !(ol != "required" && ul != "required" && lengthDelimited(o) && lengthDelimited(u)) {
+		if protoGroup(o.Kind()) == "message" || lengthDelimited(o) {
+			d.add("FIELD_LABEL_CHANGED", path, "The label of a field in the new schema does not match its label in the old schema")
+		} else {
+			d.add("FIELD_NUMERIC_LABEL_CHANGED", path, "")
+		}
 	}
 }
 

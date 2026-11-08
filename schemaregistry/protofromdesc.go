@@ -1,8 +1,12 @@
 package schemaregistry
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/bufbuild/protocompile"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"io"
 	"strconv"
 	"strings"
 
@@ -35,7 +39,7 @@ import (
 // out); the descriptor itself is the checked form.
 //
 //fuzz:parser class=schema-texts FuzzDescriptor
-func parseDescriptor(s string) (parsedSchema, bool) {
+func parseDescriptor(s string, refs ...resolvedRef) (parsedSchema, bool) {
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(s))
 	if err != nil || len(raw) == 0 {
 		return nil, false
@@ -44,7 +48,7 @@ func parseDescriptor(s string) (parsedSchema, bool) {
 	if err := proto.Unmarshal(raw, &fd); err != nil || fd.GetName() == "" && len(fd.GetMessageType()) == 0 && len(fd.GetEnumType()) == 0 && len(fd.GetService()) == 0 {
 		return nil, false
 	}
-	file, err := protodesc.NewFile(&fd, protoregistry.GlobalFiles)
+	file, err := protodesc.NewFile(&fd, descriptorImports(refs))
 	if err != nil {
 		return nil, false
 	}
@@ -189,9 +193,18 @@ func writeMessage(b *strings.Builder, m *descriptorpb.DescriptorProto, proto2 bo
 			}
 			opts = append(opts, "default = "+v)
 		}
+		if f.JsonName != nil {
+			// Set by protoc on every field, and printed by Confluent whenever it is set
+			// (recorded: protobuf-descriptor-with-import).
+			opts = append(opts, "json_name = "+strconv.Quote(f.GetJsonName()))
+		}
 		o := ""
-		if len(opts) > 0 {
-			o = " [" + strings.Join(opts, ", ") + "]"
+		switch {
+		case len(opts) == 1:
+			o = " [" + opts[0] + "]"
+		case len(opts) > 1:
+			// Several options go one to a line, as Confluent prints them.
+			o = " [\n" + fi + "  " + strings.Join(opts, ",\n"+fi+"  ") + "\n" + fi + "]"
 		}
 		fmt.Fprintf(b, "%s%s%s %s = %d%s;\n", fi, prefix, typ, f.GetName(), f.GetNumber(), o)
 	}
@@ -246,4 +259,52 @@ func writeEnum(b *strings.Builder, e *descriptorpb.EnumDescriptorProto, depth in
 func isEmptyMessage(m *descriptorpb.DescriptorProto) bool {
 	return len(m.GetField()) == 0 && len(m.GetNestedType()) == 0 && len(m.GetEnumType()) == 0 && len(m.GetReservedRange()) == 0 &&
 		len(m.GetReservedName()) == 0 && len(m.GetOneofDecl()) == 0 && !m.GetOptions().GetMapEntry()
+}
+
+// descriptorImports resolves the files a descriptor imports: its references, compiled
+// from the text they are stored as, and the well-known types. confluent-kafka for
+// Python registers a message's imported files first and sends the message's own
+// descriptor with a reference to each (recorded: protobuf-descriptor-with-import).
+func descriptorImports(refs []resolvedRef) protodesc.Resolver {
+	if len(refs) == 0 {
+		return protoregistry.GlobalFiles
+	}
+	sources := map[string]string{}
+	var names []string
+	for _, r := range refs {
+		if _, ok := sources[r.Name]; !ok {
+			names = append(names, r.Name)
+		}
+		sources[r.Name] = r.Text
+	}
+	files := new(protoregistry.Files)
+	c := protocompile.Compiler{
+		Resolver: protocompile.WithStandardImports(&protocompile.SourceResolver{
+			Accessor: func(path string) (io.ReadCloser, error) {
+				if s, ok := sources[path]; ok {
+					return io.NopCloser(strings.NewReader(s)), nil
+				}
+				return nil, fmt.Errorf("%s: no such file", path)
+			},
+		}),
+	}
+	compiled, err := c.Compile(context.Background(), names...)
+	if err != nil {
+		return protoregistry.GlobalFiles
+	}
+	var register func(f protoreflect.FileDescriptor)
+	register = func(f protoreflect.FileDescriptor) {
+		if _, err := files.FindFileByPath(f.Path()); err == nil {
+			return
+		}
+		imps := f.Imports()
+		for i := range imps.Len() {
+			register(imps.Get(i).FileDescriptor)
+		}
+		files.RegisterFile(f) //nolint:errcheck // a clash leaves the first, which is what the import names.
+	}
+	for _, f := range compiled {
+		register(f)
+	}
+	return files
 }

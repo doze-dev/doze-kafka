@@ -1,6 +1,28 @@
-# State (updated 2026-10-29)
+# State (updated 2026-11-08)
 
-Local main is ahead of origin and unpushed. Stages 0 to 2 fixed and merged after the verification pass. The mutation-survivor campaign is finished and merged; it is not to be extended (see below).
+Stages 3 (Topics) and 4 (Groups) are merged to main (PR #3, 2026-11-06). Stage 5 (Schemas) is done but for the items below, on branch `schemas-stage5`, draft PR #4 (open as a draft only so CI runs; not to be merged until the stage is done).
+
+## Stage 5, Schemas (plan/stages/schemas.md): where it stands
+All seven P1 findings are closed: SCH-1, 2, 3, 4, 5, 6, 7. Rows 1 to 5 of section 11 are done (the plan's "smallest useful cut"), with these P2/P3 findings closed as well: SCH-9, 10, 11, 12, 18, 27, 31, 37 (subject rules), 38.
+
+- Bounds (row 1, 3): references resolved once each (cap 1,000 schemas, no depth cap); Avro and JSON Schema nesting capped at 256 JSON levels; bodies 20 MiB for schemas, 64 KiB for /config and /mode (413); subjects over 16 KiB or with control characters or named __GLOBAL refused (42208); one registry per Server; read timeout 30 s, idle 2 min. Tests: `schemaregistry/bounds_test.go`, `server` TestSchemaRegistryIsOneInstance, `cmd` TestRegistryTimesOutSlowAndIdleClients.
+- Recordings (row 2): R1 to R14 all recorded against cp-schema-registry 7.7.1 on apache/kafka 4.3.1: 14 new scripts in `schemaregistry/testdata/conformance` (`scenarios_stage5_test.go`, `scenarios_protodeps_test.go`) and R9 as `testdata/compat/*-reasons.json`. Replay is green; every deliberate difference is in `knownDifferences` (conformance) or `corpusReasonDifferences` (reasons) with its reason, and in docs/schema-registry.md "Where it differs".
+- Reasons (row 4, SCH-6): 2,287 of 2,291 recorded refusals give Confluent's reasons word for word (Avro all 501; JSON Schema 1,043 of 1,045; Protobuf 739 of 741); the conformance replay compares 409 details and verbose messages in full. Avro now uses our port of Avro's SchemaCompatibility (`avrocompat.go`), not hamba's check.
+- Content type, READONLY, auth (row 5): 415 for non-JSON bodies (blocks cross-origin form posts); READONLY answers a held schema with its id and refuses a level change; soft delete drops level and mode; basic auth recorded; one log record per request; failed sign-ins slowed after five.
+- Also fixed on the way: Avro unnamed types drop doc/aliases/name; Protobuf json_name and multi-option printing; stored schemas indexed under the current canonical form so an upgrade does not mint new ids; JSON Schema reference names scoped per schema; /schemas offset and limit; fetchMaxId; a flaky storage retention test (CI); the lightness binary budgets raised with reasons.
+
+### Done since (2026-11-07 to 08)
+All 19 boards (Sc-Home, Sc-01 to Sc-18) are built; 17 are held by the design gate (`e2e/design/schemas`, 19 tests), Sc-10 and Sc-13 by console tests with their deviations in plan/00-foundation.md. `e2e/tests/schemas.spec.ts` has 21 tests. Every finding is closed; plan/stages/schemas.md section 12 gives the status of each with the test that holds it. Overnight on 2026-11-08: the delete confirms checked against a real registry (they miscounted soft-deleted versions and called a shared id lost; fixed), the registry-down page (it said "Can't reach the broker"; fixed), SIGKILL and registry-off `cmd` tests, the registry under the second identity, kcat Avro decode and the two UIs listing subjects in the compat matrix (with a libserdes patch for GitHub's Ubuntu 26.04 runner), the register message (SCH-33), the subject list without schema text (SCH-8), coverage floors at the targets (schemaregistry 92, console 90), and the schemaregistry mutation baseline re-recorded with reasons.
+
+### Left in Stage 5, for the owner
+1. Review and merge PR #4 (the owner merges it). The console mutation run is recorded and its 511 new survivors triaged (plan/stages/schemas.md section 12).
+
+### For the owner to decide
+- Decided 2026-11-08 (owner): the idle-heap gate judges the median of the starts, not the largest. Before that, on CI (linux/arm64) the median was steady across Stage 5 (1,370,872 to 1,373,640) while the largest went from 1,374,136 to 1,384,824 and failed the gate once (commit 7842097) with nothing grown. Budgets recorded before then are the largest of 20 starts and come down to the median when next recorded.
+- Nothing blocking. Re-estimate after Stage 5: rows 1 to 5 took one long session (2026-11-06/07) against 13 planned half-days.
+- Docker: the recording containers were removed (2026-11-07). To record again: apache/kafka:4.3.1 and cp-schema-registry:7.7.1 on a shared network, the registry on 127.0.0.1:18081 (SR_RECORD_URL), and for `basic-authentication` a second one with a JAAS password file (alice:alice-secret) on another port (SR_RECORD_AUTH_URL); copy the JAAS files in with docker cp, Docker Desktop does not share the scratchpad.
+
+## Earlier state (2026-10-29)
 
 ## Done since the last update
 - Mutation survivors: protocol and the small units 0 open; console 598 lived to 102 (all with reasons); broker data/admin/auth 0 open; broker groups 28 still open (24 in `groupmigrate.go`); storage log about 97 left (baseline stale, partly re-measured) and meta.

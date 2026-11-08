@@ -43,6 +43,7 @@ type Console struct {
 	log         *slog.Logger // where the console reports its own failures (Options.Logger).
 	be          *backend
 	reg         *registryClient     // nil when there is no schema registry to talk to.
+	regOff      string              // why the registry asked for did not start (Options.RegistryOffReason).
 	inspector   GroupInspector      // nil when the broker's group memory is not available to this console.
 	logs        LogSource           // nil when the broker's log cleaner is not available to this console.
 	traffic     TrafficSource       // nil when the broker's traffic is not available to this console.
@@ -92,6 +93,9 @@ type Options struct {
 	// Schemas section, links a topic to its subjects, shows registry-encoded payloads
 	// as the JSON they mean and can produce them. Empty, none of that appears.
 	RegistryURL string
+	// RegistryOffReason, when the registry was asked for and could not start, says
+	// why; the Schemas page shows it.
+	RegistryOffReason string
 	// RegistryUser and RegistryPass are HTTP basic credentials for the registry, when
 	// it requires them.
 	RegistryUser, RegistryPass string
@@ -193,6 +197,7 @@ func New(opts Options) (*Console, error) {
 	}
 	c.be = be
 	c.reg = newRegistryClient(opts.RegistryURL, opts.RegistryUser, opts.RegistryPass, opts.RegistryTLS)
+	c.regOff = opts.RegistryOffReason
 	c.traffic = opts.Traffic
 	c.inspector = opts.Groups
 	c.logs = opts.Logs
@@ -453,7 +458,8 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		// keyCaps splits how a key is drawn into its caps: "g r" is two keys.
 		"keyCaps": func(show string) []string { return strings.Fields(show) },
 		// num writes a count with thousands separators (14,407), as the boards do.
-		"num": num,
+		"num":      num,
+		"idRanges": idRangesText,
 		// needsLook is whether a topic's number is coloured in the list: a dead-letter
 		// topic that has records in it.
 		"needsLook": func(name string, msgs int64) bool { return isDeadLetterName(name) && msgs > 0 },
@@ -473,6 +479,14 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 			s, _ := settings.Lookup(settings.Topic, key)
 			return s.Unit
 		},
+		"hasRecordSubject": func(ss []topicSchema) bool {
+			for _, s := range ss {
+				if s.Label == "record" {
+					return true
+				}
+			}
+			return false
+		},
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {
@@ -486,7 +500,30 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		"sub":  func(a, b int) int { return a - b },
 		// when is the one formatter for a moment in time (timefmt.go); whenText is
 		// its plain text, for an attribute.
-		"when": when,
+		"when":      when,
+		"changed":   changedHTML,
+		"inc":       func(n int) int { return n + 1 },
+		"jsonValid": func(s string) bool { return json.Valid([]byte(s)) },
+		"gutter": func(s string) string {
+			n := max(strings.Count(strings.TrimRight(s, "\n"), "\n")+1, 11)
+			var b strings.Builder
+			for i := 1; i <= n; i++ {
+				if i > 1 {
+					b.WriteByte('\n')
+				}
+				b.WriteString(strconv.Itoa(i))
+			}
+			return b.String()
+		},
+		"lines": func(s string) int { return strings.Count(strings.TrimRight(s, "\n"), "\n") + 1 },
+		"firstFix": func(fs []regFinding) *regFinding {
+			for i := range fs {
+				if fs[i].Fix != "" {
+					return &fs[i]
+				}
+			}
+			return nil
+		},
 		// the declared key map, for the help overlay and for shell.js (keys.go).
 		"keyGroups":       keyGroups,
 		"dialogHints":     dialogHints,
@@ -514,9 +551,11 @@ func templateFuncs(prefix string, teach func(kind, name string) string) template
 		"lower": strings.ToLower,
 		// capital and upper write a word the way a column of the boards does: Topic, Write,
 		// ALLOW. The stored value stays as the broker names it.
-		"capital":  upperFirst,
-		"upper":    strings.ToUpper,
-		"jsonTint": jsonTint,
+		"capital":      upperFirst,
+		"upper":        strings.ToUpper,
+		"jsonTint":     jsonTint,
+		"protoTint":    protoTint,
+		"subjectTopic": subjectTopic,
 		"stateBadge": func(state string) string {
 			switch state {
 			case "Stable":

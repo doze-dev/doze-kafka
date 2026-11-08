@@ -898,6 +898,4 @@ test('Tp-02: the create form\'s cards are 12 px apart', async ({ page }) => {
   const a = (await cards.nth(0).boundingBox())!;
   const b = (await cards.nth(1).boundingBox())!;
   expect(Math.round(b.y - (a.y + a.height))).toBe(12);
-  await page.goto('new/schema');
-  await expect(page.locator('form.form-page .form-sec').first()).toHaveCSS('margin-bottom', '12px');
 });

@@ -1,0 +1,205 @@
+[
+  {
+    "method": "POST",
+    "path": "/subjects/ro/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/ro",
+    "body": "{\"mode\":\"READONLY\"}",
+    "status": 200,
+    "response": {
+      "mode": "READONLY"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/config/ro",
+    "body": "{\"compatibility\":\"FULL\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42205,
+      "message": "Subject ro is in read-only mode"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/config/ro",
+    "status": 404,
+    "response": {
+      "error_code": 40408,
+      "message": "Subject 'ro' does not have subject-level compatibility configured"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/config/ro",
+    "status": 404,
+    "response": {
+      "error_code": 40401,
+      "message": "Subject 'ro' not found."
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/ro/versions/latest",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/compatibility/subjects/ro/versions/latest?verbose=true",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 200,
+    "response": {
+      "is_compatible": true,
+      "messages": []
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ro",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "subject": "ro",
+      "version": 1,
+      "id": 1,
+      "schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"id\",\"type\":\"long\"}]}"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ro/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"}]}\"}",
+    "status": 200,
+    "response": {
+      "id": 1
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/subjects/ro/versions",
+    "body": "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"User\\\",\\\"fields\\\":[{\\\"name\\\":\\\"id\\\",\\\"type\\\":\\\"long\\\"},{\\\"name\\\":\\\"email\\\",\\\"type\\\":[\\\"null\\\",\\\"string\\\"],\\\"default\\\":null}]}\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42205,
+      "message": "Subject ro is in read-only mode"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/ro/versions/1",
+    "status": 422,
+    "response": {
+      "error_code": 42205,
+      "message": "Subject ro is in read-only mode"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/subjects/ro",
+    "status": 422,
+    "response": {
+      "error_code": 42205,
+      "message": "Subject ro is in read-only mode"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/ro",
+    "body": "{\"mode\":\"IMPORT\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42205,
+      "message": "Cannot import since found existing subjects"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/ro?force=true",
+    "body": "{\"mode\":\"IMPORT\"}",
+    "status": 200,
+    "response": {
+      "mode": "IMPORT"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/ro",
+    "body": "{\"mode\":\"READONLY_OVERRIDE\"}",
+    "status": 200,
+    "response": {
+      "mode": "READONLY_OVERRIDE"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode/ro",
+    "status": 200,
+    "response": {
+      "mode": "READONLY_OVERRIDE"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode",
+    "body": "{\"mode\":\"IMPORT\"}",
+    "status": 422,
+    "response": {
+      "error_code": 42205,
+      "message": "Cannot import since found existing subjects"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode?force=true",
+    "body": "{\"mode\":\"IMPORT\"}",
+    "status": 200,
+    "response": {
+      "mode": "IMPORT"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode",
+    "status": 200,
+    "response": {
+      "mode": "IMPORT"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode",
+    "body": "{\"mode\":\"READWRITE\"}",
+    "status": 200,
+    "response": {
+      "mode": "READWRITE"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/mode/ro",
+    "body": "{\"mode\":\"READWRITE\"}",
+    "status": 200,
+    "response": {
+      "mode": "READWRITE"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/mode/ro",
+    "status": 200,
+    "response": {
+      "mode": "READWRITE"
+    }
+  }
+]

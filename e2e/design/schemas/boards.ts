@@ -1,0 +1,370 @@
+import type { Probe } from '../lib/compare';
+import { SHELL, TEXT_W, TEXT_H } from '../lib/probes';
+
+// The Schemas boards and what the gate compares on each. What is data (the addresses in
+// the producer's lines, the registry's requests) is held to the broker in schemas.spec.ts;
+// the probes compare the page's shape, type and colour with the board's.
+
+const ADDR = 'its lines carry this broker\'s and this registry\'s addresses, which are the test broker\'s ports, not the board\'s 9092 and 8081';
+
+/** The registry's wire dock at the foot of a Schemas page. */
+export const DOCK: Probe[] = [
+  { el: 'dock', board: '.dock', live: '#wire-dock' },
+  { el: 'dock head', board: '.dock .dh', live: '#wire-dock .dh' },
+  { el: 'dock title', board: '.dock .dh > .b', live: '#wire-dock .dh > .b', text: true },
+  { el: 'dock pill', board: '.dock .dh > .pill', live: '#wire-dock .dh > .pill', text: true },
+  { el: 'dock note', board: '.dock .dh > .note', live: '#wire-dock .dh > .note', text: true },
+  { el: 'dock table head', board: '.dock .r.h', live: '#wire-dock .r.h' },
+  { el: 'dock head cell', board: '.dock .r.h > span', live: '#wire-dock .r.h > span', text: true },
+  { el: 'dock row', board: '.dock .r:not(.h)', live: '#wire-dock .r[data-reg-row]' },
+  { el: 'dock time', board: '.dock .r:not(.h) > :nth-child(1)', live: '#wire-dock .r[data-reg-row] > :nth-child(1)', free: { w: TEXT_W } },
+  { el: 'dock method', board: '.dock .r:not(.h) > :nth-child(2)', live: '#wire-dock .r[data-reg-row] > :nth-child(2)' },
+  { el: 'dock path', board: '.dock .r:not(.h) > :nth-child(3)', live: '#wire-dock .r[data-reg-row] > :nth-child(3)' },
+  { el: 'dock status', board: '.dock .r:not(.h) > :nth-child(4)', live: '#wire-dock .r[data-reg-row] > :nth-child(4)' },
+];
+
+/** Sc-01: no subject registered. */
+export const NONE: Probe[] = [
+  ...SHELL,
+  { el: 'list', board: '.list', live: 'aside.list' },
+  { el: 'list filter', board: '.list > :first-child', live: '.list > .list-filter' },
+  { el: 'list none', board: '.list > .col.g4', live: '.list .list-none' },
+  { el: 'list none title', board: '.list > .col.g4 > .b', live: '.list .list-none > .b', text: true },
+  { el: 'list none note', board: '.list > .col.g4 > .note', live: '.list .list-none > .note', text: true },
+  { el: 'main', board: 'main.main', live: 'main.main' },
+  { el: 'id band', board: 'main > .row.sb', live: 'main > .idband' },
+  { el: 'h1', board: 'main h1', live: 'main h1', text: true },
+  { el: 'h1 note', board: 'main h1 + .note', live: 'main h1 + .note', free: { w: TEXT_W, text: ADDR } },
+  { el: 'register button', board: 'main > .row.sb .btn.pri', live: 'main > .idband .btn.pri', text: true },
+  { el: 'lead', board: 'main > .callout', live: 'main > .sc-none-lead' },
+  { el: 'lead title', board: 'main > .callout > .b', live: 'main > .sc-none-lead > .b', text: true },
+  { el: 'lead text', board: 'main > .callout > span:last-child', live: 'main > .sc-none-lead > span:last-child', text: true },
+  { el: 'steps row', board: 'main > .row.g12', live: 'main > .sc-none' },
+  { el: 'steps card', board: 'main > .row.g12 > .card', live: 'main > .sc-none > .card', free: { h: 'its height is the producer\'s lines, which are this broker\'s (with SASL on, the login lines are added)' } },
+  { el: 'steps title', board: 'main > .row.g12 > .card .h2', live: 'main > .sc-none > .card .h2', text: true },
+  { el: 'step 1', board: 'main > .row.g12 > .card .row.g8', live: 'main > .sc-none > .card .row.g8', text: true },
+  { el: 'step number', board: 'main > .row.g12 > .card .num', live: 'main > .sc-none > .card .num', text: true },
+  { el: 'producer lines', board: 'main > .row.g12 > .card pre.code', live: 'main > .sc-none > .card pre.code', free: { text: ADDR, w: ADDR, h: 'its lines are this broker\'s: the board draws the SASL login lines, a broker without SASL has none' } },
+  { el: 'step 2', board: 'main > .row.g12 > .card .row.g8', live: 'main > .sc-none > .card .row.g8', nth: 1, free: { y: 'it follows the producer\'s lines', h: TEXT_H, text: 'it names a topic this broker has, or <topic> when it has none; the board names harbour.checkout.orders' } },
+  { el: 'step 3', board: 'main > .row.g12 > .card .row.g8', live: 'main > .sc-none > .card .row.g8', nth: 2, text: true, free: { y: 'it follows the producer\'s lines' } },
+  { el: 'side', board: 'main > .row.g12 > .col', live: 'main > .sc-none > .sc-none-side' },
+  { el: 'side callout', board: 'main > .row.g12 > .col .callout', live: 'main > .sc-none > .sc-none-side .callout' },
+  { el: 'side callout 2', board: 'main > .row.g12 > .col .callout', live: 'main > .sc-none > .sc-none-side .callout', nth: 1 },
+  { el: 'side title', board: 'main > .row.g12 > .col .callout .b', live: 'main > .sc-none > .sc-none-side .callout .b', text: true },
+  { el: 'side note', board: 'main > .row.g12 > .col .callout .note', live: 'main > .sc-none > .sc-none-side .callout .note', text: true },
+  { el: 'side button', board: 'main > .row.g12 > .col .callout .btn', live: 'main > .sc-none > .sc-none-side .callout .btn', text: true },
+  ...DOCK,
+];
+
+const SAMPLE = 'it is data: the board\'s sample times, counts and neighbours are not this broker\'s';
+
+/** A subject's list pane, title band, facts line, neighbours and tabs (Sc-05 to Sc-08, Sc-18). */
+export const SUBJECT_HEAD: Probe[] = [
+  ...SHELL,
+  { el: 'list', board: '.list', live: 'aside.list' },
+  { el: 'list filter', board: '.list > :first-child', live: '.list > .list-filter' },
+  { el: 'list item on', board: '.list .li.on', live: '.list .li.on' },
+  { el: 'list item', board: '.list .li:not(.on)', live: '.list .li:not(.on)' },
+  { el: 'list name', board: '.list .li:not(.on) .m.el', live: '.list .li:not(.on) .m.el', text: true },
+  { el: 'list pill', board: '.list .li:not(.on) .pill', live: '.list .li:not(.on) .pill', text: true },
+  { el: 'main', board: 'main.main', live: 'main.main' },
+  { el: 'id band', board: 'main > .row.sb', live: 'main > .idband' },
+  { el: 'h1', board: 'main h1', live: 'main h1', text: true },
+  { el: 'type pill', board: 'main > .row.sb .pill', live: 'main > .idband .pill', text: true },
+  { el: 'register button', board: 'main > .row.sb .btn.pri', live: 'main > .idband .btn.pri', text: true },
+  { el: 'more button', board: 'main > .row.sb .btn[aria-label="More actions"]', live: 'main > .idband .btn[aria-label="More actions"]' },
+  { el: 'facts', board: 'main > .row.ce.g8.wrap', live: '#subject-facts', free: { w: SAMPLE } },
+  { el: 'fact', board: 'main > .row.ce.g8.wrap > .m', live: '#subject-facts > .m', text: true },
+  { el: 'neighbours', board: 'main > .well', live: '#neighbours' },
+  { el: 'neighbours cap', board: 'main > .well > .cap', live: '#neighbours > .cap', text: true },
+  { el: 'tabs', board: 'main .tabs', live: 'main nav.tabs' },
+  { el: 'tab on', board: 'main .tabs .tab.on', live: 'main nav.tabs .tab.on', text: true },
+  { el: 'tab', board: 'main .tabs .tab:not(.on)', live: 'main nav.tabs .tab:not(.on)', text: true },
+  { el: 'tab 3', board: 'main .tabs .tab:not(.on)', live: 'main nav.tabs .tab:not(.on)', nth: 2, text: true },
+];
+
+/** The versions table. */
+export const VERSIONS: Probe[] = [
+  { el: 'versions', board: 'main > .card:not(.pad)', live: '#versions-table' },
+  { el: 'versions head', board: 'main > .card:not(.pad) .r.h', live: '#versions-table .r.h' },
+  { el: 'versions head cell', board: 'main > .card:not(.pad) .r.h > span', live: '#versions-table .r.h > span', text: true },
+  { el: 'versions head cell 3', board: 'main > .card:not(.pad) .r.h > span', live: '#versions-table .r.h > span', nth: 2, text: true },
+  { el: 'versions head cell 5', board: 'main > .card:not(.pad) .r.h > span', live: '#versions-table .r.h > span', nth: 4, text: true },
+  { el: 'version row', board: 'main > .card:not(.pad) .r:not(.h)', live: '#versions-table .r:not(.h)' },
+  { el: 'version', board: 'main > .card:not(.pad) .r:not(.h) > :nth-child(1)', live: '#versions-table .r:not(.h) > :nth-child(1)', text: true },
+  { el: 'version id', board: 'main > .card:not(.pad) .r:not(.h) > :nth-child(2)', live: '#versions-table .r:not(.h) > :nth-child(2)', text: true },
+  { el: 'version changed', board: 'main > .card:not(.pad) .r:not(.h) > :nth-child(3)', live: '#versions-table .r:not(.h) > :nth-child(3)', text: true },
+  { el: 'version registered', board: 'main > .card:not(.pad) .r:not(.h) > :nth-child(4)', live: '#versions-table .r:not(.h) > :nth-child(4)', free: { text: SAMPLE } },
+  { el: 'version checked', board: 'main > .card:not(.pad) .r:not(.h) > :nth-child(5)', live: '#versions-table .r:not(.h) > :nth-child(5)', text: true },
+];
+
+/** The schema on show: its heading, buttons and text. */
+export const SCHEMA: Probe[] = [
+  { el: 'schema head', board: 'main > .row.ce.sb:has(.h2)', live: '#schema-head' },
+  { el: 'schema title', board: 'main > .row.ce.sb:has(.h2) .h2', live: '#schema-head .h2', text: true },
+  { el: 'schema note', board: 'main > .row.ce.sb:has(.h2) .note', live: '#schema-head .note', text: true },
+  { el: 'schema button', board: 'main > .row.ce.sb:has(.h2) .btn', live: '#schema-head .btn', text: true },
+  { el: 'schema text', board: 'main pre.code', live: 'main pre.code.sc-text' },
+];
+
+/** Try it. */
+export const TRY: Probe[] = [
+  { el: 'try', board: 'main > .card.pad', live: '#try-it' },
+  { el: 'try title', board: 'main > .card.pad .h2', live: '#try-it .h2', text: true },
+  { el: 'try note', board: 'main > .card.pad .note', live: '#try-it .note', text: true },
+  { el: 'try field', board: 'main > .card.pad .inp', live: '#try-it .inp' },
+  { el: 'try button', board: 'main > .card.pad .btn', live: '#try-it .btn', text: true },
+  { el: 'try button 2', board: 'main > .card.pad .btn', live: '#try-it .btn', nth: 1, text: true },
+  { el: 'try pill', board: 'main > .card.pad .pill', live: '#try-it .try-pill .pill', text: true },
+];
+
+/** Sc-05's inspector: one version. */
+export const VERSION_INSP: Probe[] = [
+  { el: 'inspector', board: 'aside.insp', live: '#inspector-panel' },
+  { el: 'inspector head', board: 'aside.insp .hd', live: '#inspector .inspector-h' },
+  { el: 'inspector cap', board: 'aside.insp .hd .cap', live: '#inspector .inspector-h .cap', text: true },
+  { el: 'inspector title', board: 'aside.insp .hd .h2', live: '#inspector #inspector-title', text: true },
+  { el: 'inspector kv', board: 'aside.insp .kv', live: '#inspector .kv' },
+  { el: 'inspector key', board: 'aside.insp .kv > :nth-child(1)', live: '#inspector .kv > :nth-child(1)', text: true },
+  { el: 'inspector value', board: 'aside.insp .kv > :nth-child(2)', live: '#inspector .kv > :nth-child(2)', text: true },
+  { el: 'inspector wire', board: 'aside.insp .callout', live: '#inspector .callout' },
+  { el: 'inspector wire title', board: 'aside.insp .callout .b', live: '#inspector .callout .b', text: true },
+  { el: 'inspector messages', board: 'aside.insp .bd > .col.g4 > .b', live: '#inspector .versionb > .col.g4 > .b', text: true },
+  { el: 'inspector button', board: 'aside.insp .bd > .row.g8 .btn', live: '#inspector .versionb > .row.g8 .btn', text: true },
+];
+
+/** Sc-06: the diff. Its facts line is the pair's, not the subject's. */
+export const DIFF: Probe[] = [
+  ...SUBJECT_HEAD.filter((p) => p.el !== 'facts' && p.el !== 'fact'),
+  { el: 'diff facts', board: 'main > .row.ce.g8.wrap', live: '#diff-facts' },
+  { el: 'diff fact', board: 'main > .row.ce.g8.wrap > .m', live: '#diff-facts > .m', text: true },
+  { el: 'diff fact added', board: 'main > .row.ce.g8.wrap > .m.ok', live: '#diff-facts > .m.ok', text: true },
+  { el: 'diff fact removed', board: 'main > .row.ce.g8.wrap > .m.bad', live: '#diff-facts > .m.bad', text: true },
+  { el: 'diff fact changed', board: 'main > .row.ce.g8.wrap > .m.warn', live: '#diff-facts > .m.warn', text: true },
+  { el: 'diff note', board: 'main > .row.ce.g8.wrap > .note', live: '#diff-facts > .note', text: true },
+  { el: 'compare row', board: 'main > .row.sb.ce:has(.seg)', live: 'main > .row.sb.ce:has(.seg)' },
+  { el: 'compare title', board: 'main > .row.sb.ce:has(.seg) .h2', live: 'main > .row.sb.ce:has(.seg) .h2', text: true },
+  { el: 'compare select', board: 'main > .row.sb.ce:has(.seg) select', live: 'main > .row.sb.ce:has(.seg) select' },
+  { el: 'layout', board: 'main .seg', live: 'main .seg' },
+  { el: 'layout on', board: 'main .seg .on', live: 'main .seg .on', text: true },
+  { el: 'diff', board: 'main > .card', live: '#diff-table' },
+  { el: 'diff head', board: 'main > .card .r.h', live: '#diff-table .r.h' },
+  { el: 'diff head cell', board: 'main > .card .r.h > span:nth-child(2)', live: '#diff-table .r.h > span:nth-child(2)', free: { text: SAMPLE, w: SAMPLE } },
+  { el: 'diff row', board: 'main > .card .r:not(.h)', live: '#diff-table .r:not(.h)' },
+  { el: 'diff number', board: 'main > .card .r:not(.h) > :nth-child(1)', live: '#diff-table .r:not(.h) > :nth-child(1)', text: true },
+  { el: 'diff line', board: 'main > .card .r:not(.h) > :nth-child(2)', live: '#diff-table .r:not(.h) > :nth-child(2)', text: true },
+  { el: 'diff removed', board: 'main > .card .r:not(.h) > :nth-child(2)[style*=badbg]', live: '#diff-table .r:not(.h) > .dl-del:nth-child(2)', text: true },
+  { el: 'diff added', board: 'main > .card .r:not(.h) > :nth-child(4)[style*=okbg]', live: '#diff-table .r:not(.h) > .dl-add:nth-child(4)', text: true },
+  { el: 'callouts', board: 'main > .row.g12', live: 'main > .row.g12' },
+  { el: 'readers', board: 'main > .row.g12 > .callout', live: 'main > .row.g12 > .callout' },
+  { el: 'readers title', board: 'main > .row.g12 > .callout .b', live: 'main > .row.g12 > .callout .b', text: true },
+  { el: 'levels', board: 'main > .row.g12 > .callout', live: 'main > .row.g12 > .callout', nth: 1 },
+  { el: 'levels title', board: 'main > .row.g12 > .callout .b', live: 'main > .row.g12 > .callout .b', nth: 1, text: true },
+];
+
+/** The register page (Sc-02 to Sc-04): the title band, the form, the answer and the actions. */
+export const REGISTER: Probe[] = [
+  ...SHELL,
+  { el: 'list', board: '.list', live: 'aside.list' },
+  { el: 'list item on', board: '.list .li.on', live: '.list .li.on' },
+  { el: 'list item', board: '.list .li:not(.on)', live: '.list .li:not(.on)' },
+  { el: 'main', board: 'main.main', live: 'main.main' },
+  { el: 'id band', board: 'main > .row.sb', live: 'main .idband' },
+  { el: 'h1', board: 'main h1', live: 'main h1', text: true },
+  { el: 'h1 note', board: 'main h1 + .note', live: 'main h1 + .note', text: true },
+  { el: 'head button', board: 'main > .row.sb .btn.pri', live: 'main .idband .btn.pri', text: true },
+  { el: 'form card', board: 'main > .row.sb + .card', live: 'main .sc-reg-form > .card' },
+  { el: 'subject label', board: 'main label[for=subj]', live: 'main label[for=f-subject]', text: true },
+  { el: 'subject', board: 'main #subj', live: 'main #f-subject' },
+  { el: 'type label', board: 'main .card .row.g16 > .col:nth-child(2) > .b', live: 'main .sc-reg-form > .card .row.g16 > .col:nth-child(2) > .b', text: true },
+  { el: 'type', board: 'main .seg', live: 'main .sc-seg' },
+  { el: 'type on', board: 'main .seg .on', live: 'main .sc-seg .on', text: true },
+  { el: 'schema label', board: 'main label[for=sch]', live: 'main label[for=f-schema]', text: true },
+  { el: 'schema stats', board: 'main label[for=sch] + .note', live: 'main #reg-stats', text: true },
+  { el: 'gutter', board: 'main pre.code[aria-hidden]', live: 'main pre.sc-gutter' },
+  { el: 'schema', board: 'main pre#sch', live: 'main #f-schema' },
+  { el: 'answer', board: 'main > .callout', live: 'main #reg-answer > .callout' },
+  { el: 'answer title', board: 'main > .callout .b', live: 'main #reg-answer > .callout .b', text: true },
+  { el: 'answer note', board: 'main > .callout .note', live: 'main #reg-answer > .callout .note' },
+  { el: 'actions', board: 'main > .row.g8.ce', live: 'main #reg-acts' },
+  { el: 'action', board: 'main > .row.g8.ce > .btn:not(.pri)', live: 'main #reg-acts > .btn:not(.pri)', text: true },
+  { el: 'register', board: 'main > .row.g8.ce > .btn.pri', live: 'main #reg-acts > .btn.pri', text: true },
+  { el: 'actions note', board: 'main > .row.g8.ce > .note', live: 'main #reg-acts > .note' },
+];
+
+/** Sc-02's extras: the subject's note, the references and the options. */
+export const REGISTER_NEW: Probe[] = [
+  { el: 'subject note', board: 'main #subj + .note', live: 'main #f-subject + .note', free: { text: SAMPLE } },
+  { el: 'type note', board: 'main .seg + .note', live: 'main .sc-seg + input + .note, main .sc-seg + .note', text: true },
+  { el: 'refs label', board: 'main .card .row.g16:last-child > .col:first-child > .b', live: 'main #reg-refs > .b', text: true },
+  { el: 'refs none', board: 'main .card .well', live: 'main #reg-refs .well' },
+  { el: 'refs none note', board: 'main .card .well .note', live: 'main #reg-refs .well .note', text: true },
+  { el: 'refs add', board: 'main .card .well .btn', live: 'main #reg-refs .well .btn', text: true },
+  { el: 'normalize', board: 'main label:has(input[type=checkbox])', live: 'main label:has(input[name=normalize])', text: true },
+];
+
+/** Sc-04's table of what the registry found. */
+export const FINDINGS: Probe[] = [
+  { el: 'findings', board: 'main > .callout + .card', live: 'main .sc-findings' },
+  { el: 'findings head', board: 'main > .callout + .card .r.h', live: 'main .sc-findings .r.h' },
+  { el: 'findings head cell', board: 'main > .callout + .card .r.h > span', live: 'main .sc-findings .r.h > span', text: true },
+  { el: 'finding', board: 'main > .callout + .card .r:not(.h)', live: 'main .sc-findings .r:not(.h)' },
+  { el: 'finding type', board: 'main > .callout + .card .r:not(.h) > :nth-child(2)', live: 'main .sc-findings .r:not(.h) > :nth-child(2)', text: true },
+  { el: 'finding fix', board: 'main > .callout + .card .r:not(.h) .btn', live: 'main .sc-findings .r:not(.h) .btn', text: true },
+];
+
+/** Sc-09: the levels, the scope, the mode and Try it. */
+export const COMPAT: Probe[] = [
+  { el: 'levels', board: 'main > .row.g12 > .card', live: '#compat-form > .card' },
+  { el: 'levels head', board: 'main > .row.g12 > .card .r.h', live: '#compat-form > .card .r.h' },
+  { el: 'levels head cell', board: 'main > .row.g12 > .card .r.h > span', live: '#compat-form > .card .r.h > span', text: true },
+  { el: 'level', board: 'main > .row.g12 > .card .r:not(.h):not(.on)', live: '#compat-form > .card .r:not(.h):not(.on)' },
+  { el: 'level on', board: 'main > .row.g12 > .card .r.on', live: '#compat-form > .card .r.on' },
+  { el: 'level name', board: 'main > .row.g12 > .card .r:not(.h) > .m', live: '#compat-form > .card .r:not(.h) > .m', text: true },
+  { el: 'level says', board: 'main > .row.g12 > .card .r:not(.h) > .el', live: '#compat-form > .card .r:not(.h) > .el', text: true },
+  { el: 'level now', board: 'main > .row.g12 > .card .tag', live: '#compat-form > .card .tag', text: true },
+  { el: 'side', board: 'main > .row.g12 > .col', live: '#compat-form > .col' },
+  { el: 'scope', board: 'main > .row.g12 > .col > .callout', live: '#compat-form > .col > .callout' },
+  { el: 'scope title', board: 'main > .row.g12 > .col > .callout .b', live: '#compat-form > .col > .callout .b', text: true },
+  { el: 'scope seg', board: 'main > .row.g12 > .col > .callout .seg', live: '#compat-form > .col > .callout .seg' },
+  { el: 'scope on', board: 'main > .row.g12 > .col > .callout .seg .on', live: '#compat-form > .col > .callout .seg .on', text: true },
+  { el: 'changing', board: 'main > .row.g12 > .col > .callout', live: '#compat-form > .col > .callout', nth: 1 },
+  { el: 'changing note', board: 'main > .row.g12 > .col > .callout .note', live: '#compat-form > .col > .callout .note', nth: 1, text: true },
+  { el: 'mode', board: 'main > .row.g12 > .col > .callout', live: '#compat-form > .col > .callout', nth: 2 },
+  { el: 'mode on', board: 'main > .row.g12 > .col > .callout .seg .on', live: '#compat-form > .col > .callout .seg .on', nth: 1, text: true },
+  { el: 'try', board: 'main > .card.pad', live: '#level-try' },
+  { el: 'try title', board: 'main > .card.pad .h2', live: '#level-try .h2', text: true },
+  { el: 'try body', board: 'main > .card.pad .m.grow', live: '#level-try .m.grow', text: true },
+  { el: 'try button', board: 'main > .card.pad .btn', live: '#level-try .btn', text: true },
+];
+
+const ON_REGISTER = 'DEVIATES: Sc-15 draws the refusal in the subject\'s frame, above "The attempt"; the console draws it on the register page, where the register was refused, under the form (plan/00-foundation.md, Sc-15)';
+/** Sc-15: a register refused because the subject is read-only (42205). */
+export const READONLY: Probe[] = [
+  { el: 'refusal', board: 'main > .callout.deny', live: '#reg-answer > .callout.deny', free: { y: ON_REGISTER, x: ON_REGISTER, w: ON_REGISTER } },
+  { el: 'refusal title', board: 'main > .callout.deny .b', live: '#reg-answer > .callout.deny .b', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'refusal code', board: 'main > .callout.deny .row .m', live: '#reg-answer > .callout.deny .row .m', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'refusal note', board: 'main > .callout.deny > .note', live: '#reg-answer > .callout.deny > .note', free: { y: ON_REGISTER, x: ON_REGISTER, w: ON_REGISTER, h: ON_REGISTER, text: 'the next id is this world\'s' } },
+  { el: 'mode callout', board: 'main > .row.g12 > .col > .callout', live: '#reg-answer .sc-ro > .callout', free: { y: ON_REGISTER, x: ON_REGISTER, w: ON_REGISTER, h: ON_REGISTER } },
+  { el: 'mode title', board: 'main > .row.g12 > .col > .callout .b', live: '#reg-answer .sc-ro > .callout .b', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'mode seg on', board: 'main > .row.g12 > .col > .callout .seg .on', live: '#reg-answer .sc-ro > .callout .seg .on', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'mode button', board: 'main > .row.g12 > .col > .callout .btn', live: '#reg-answer .sc-ro > .callout .btn', text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+  { el: 'why', board: 'main > .row.g12 > .col > .callout', live: '#reg-answer .sc-ro > .callout', nth: 1, free: { y: ON_REGISTER, x: ON_REGISTER, w: ON_REGISTER, h: ON_REGISTER } },
+  { el: 'why title', board: 'main > .row.g12 > .col > .callout .b', live: '#reg-answer .sc-ro > .callout .b', nth: 1, text: true, free: { y: ON_REGISTER, x: ON_REGISTER } },
+];
+
+// Inside a dialog, x and y are measured from the dialog's corner (homes/confirms.spec.ts).
+const IN = (n: number) => ({ board: '.modal', live: '#confirm .modal', nth: n, liveNth: 0 });
+const DIALOG_TEXT = 'its height is its text, which is this world\'s subject and counts';
+/** Sc-12: the soft delete of a version (0) and the permanent delete of the subject (1). */
+export const confirmProbes = (n: number): Probe[] => [
+  { el: 'scrim', board: '.scrim', live: '#confirm.overlay' },
+  { el: 'dialog', board: '.modal', live: '#confirm .modal', nth: n, liveNth: 0, free: { h: DIALOG_TEXT, x: 'the board draws its two specimens at the sides of the page; the console centres the one that is open', y: 'the board draws its two specimens at the sides of the page; the console centres the one that is open' } },
+  { el: 'dialog pad', board: '.modal > .pad', live: '#confirm .modal > .pad', nth: n, liveNth: 0, origin: IN(n), free: { h: DIALOG_TEXT } },
+  { el: 'title', board: '.modal .h2', live: '#confirm-title', nth: n, liveNth: 0, origin: IN(n), free: { w: DIALOG_TEXT, text: DIALOG_TEXT } },
+  { el: 'call', board: '.modal .h2 + .m', live: '#confirm-calltop', nth: n, liveNth: 0, origin: IN(n), free: { w: DIALOG_TEXT, text: DIALOG_TEXT } },
+  { el: 'part head', board: '.modal .col.g4 > .b', live: '#confirm-parts > .b', nth: n * 3, liveNth: 0, origin: IN(n), text: true, free: { y: DIALOG_TEXT } },
+  { el: 'part text', board: '.modal .col.g4 > span:not(.b)', live: '#confirm-parts > span:not(.b)', nth: n * 3, liveNth: 0, origin: IN(n), free: { h: DIALOG_TEXT, w: DIALOG_TEXT, text: DIALOG_TEXT, y: DIALOG_TEXT } },
+  { el: 'part head 2', board: '.modal .col.g4 > .b', live: '#confirm-parts > .b', nth: n * 3 + 1, liveNth: 1, origin: IN(n), text: true, free: { y: DIALOG_TEXT } },
+  { el: 'part head 3', board: '.modal .col.g4 > .b', live: '#confirm-parts > .b', nth: n * 3 + 2, liveNth: 2, origin: IN(n), text: true, free: { y: DIALOG_TEXT } },
+  { el: 'callout', board: '.modal .callout', live: '#confirm .modal .callout', nth: n, liveNth: 0, origin: IN(n), free: { h: DIALOG_TEXT, y: DIALOG_TEXT } },
+  { el: 'buttons', board: '.modal .row.g8.ce', live: '#confirm .confirm-f', nth: n, liveNth: 0, origin: IN(n), free: { y: DIALOG_TEXT } },
+  { el: 'cancel', board: '.modal .row.g8.ce .btn:not(.danger)', live: '#confirm-no', nth: n, liveNth: 0, text: true, origin: IN(n), free: { y: DIALOG_TEXT } },
+  { el: 'verb', board: '.modal .row.g8.ce .btn.danger', live: '#confirm-yes', nth: n, liveNth: 0, origin: IN(n), text: true, free: { y: DIALOG_TEXT } },
+  ...(n === 1 ? [
+    { el: 'typed label', board: '.modal label[for=cf]', live: '#confirm-type-l', liveNth: 0, origin: IN(1), text: true, free: { y: DIALOG_TEXT } },
+    { el: 'typed', board: '.modal #cf', live: '#confirm-type', liveNth: 0, origin: IN(1), free: { y: DIALOG_TEXT } },
+  ] as Probe[] : []),
+];
+
+/** Sc-11: the Used by tab. */
+export const USED: Probe[] = [
+  { el: 'used head', board: 'main > .row.ce.sb:has(.h2)', live: 'main > .row.ce.sb:has(.h2)' },
+  { el: 'used title', board: 'main > .row.ce.sb .h2', live: 'main > .row.ce.sb .h2', free: { text: 'the board marks the heading "new"; a page has no such tag', w: 'the board marks the heading "new"; a page has no such tag' } },
+  { el: 'used note', board: 'main > .row.ce.sb .note', live: 'main > .row.ce.sb .note', free: { text: SAMPLE, w: SAMPLE, x: SAMPLE } },
+  { el: 'used table', board: 'main > .card:not(.pad)', live: '#used-table', free: { h: SAMPLE } },
+  { el: 'used table head', board: 'main > .card:not(.pad) .r.h', live: '#used-table .r.h' },
+  { el: 'used head cell', board: 'main > .card:not(.pad) .r.h > span', live: '#used-table .r.h > span', text: true },
+  { el: 'used row', board: 'main > .card:not(.pad) .r.on', live: '#used-table .r.on' },
+  { el: 'used topic', board: 'main > .card:not(.pad) .r.on > :nth-child(1)', live: '#used-table .r.on > :nth-child(1)', text: true },
+  { el: 'used id', board: 'main > .card:not(.pad) .r.on > :nth-child(3)', live: '#used-table .r.on > :nth-child(3)', text: true },
+  { el: 'used lane', board: 'main > .card:not(.pad) .r.on .lane', live: '#used-table .r.on .lane' },
+  { el: 'used open', board: 'main > .card:not(.pad) .r.on > a', live: '#used-table .r.on > a', text: true },
+  { el: 'used callouts', board: 'main > .row.g12', live: 'main > .row.g12' },
+  { el: 'used callout', board: 'main > .row.g12 > .callout', live: 'main > .row.g12 > .callout', nth: 1 },
+  { el: 'used try', board: 'main > .card.pad', live: '#open-id' },
+  { el: 'used try title', board: 'main > .card.pad .h2', live: '#open-id .h2', text: true },
+  { el: 'used try field', board: 'main > .card.pad .inp', live: '#open-id .inp' },
+  { el: 'used try button', board: 'main > .card.pad .btn', live: '#open-id .btn', text: true },
+];
+
+/** Sc-17: a message nothing here can decode. */
+export const UNDECODED: Probe[] = [
+  { el: 'why', board: 'main > .callout.warn', live: '#undecoded-why', free: { h: SAMPLE } },
+  { el: 'why title', board: 'main > .callout.warn .b', live: '#undecoded-why .b', text: true },
+  { el: 'why code', board: 'main > .callout.warn .row .m', live: '#undecoded-why .row .m', text: true },
+  { el: 'why raw', board: 'main > .callout.warn > .m', live: '#undecoded-why > .m', text: true },
+  { el: 'list head', board: 'main > .row.ce.sb:has(.h2)', live: 'main > .row.ce.sb:has(.h2)' },
+  { el: 'list title', board: 'main > .row.ce.sb .h2', live: 'main > .row.ce.sb .h2', text: true },
+  { el: 'undecoded', board: 'main > .card', live: '#undecoded-table' },
+  { el: 'undecoded head cell', board: 'main > .card .r.h > span', live: '#undecoded-table .r.h > span', text: true },
+  { el: 'undecoded row', board: 'main > .card .r.on', live: '#undecoded-table .r.on' },
+  { el: 'undecoded id', board: 'main > .card .r.on > :nth-child(4)', live: '#undecoded-table .r.on > :nth-child(4)', text: true },
+  { el: 'undecoded why', board: 'main > .card .r.on > :nth-child(5)', live: '#undecoded-table .r.on > :nth-child(5)', text: true },
+  { el: 'undecoded open', board: 'main > .card .r.on > a', live: '#undecoded-table .r.on > a', text: true },
+  { el: 'callouts', board: 'main > .row.g12', live: 'main > .row.g12' },
+  { el: 'callout title', board: 'main > .row.g12 > .callout .b', live: 'main > .row.g12 > .callout .b', text: true },
+];
+
+/** Sc-16: a subject not found. */
+export const NOT_FOUND: Probe[] = [
+  ...SHELL,
+  { el: 'list', board: '.list', live: 'aside.list' },
+  { el: 'list item', board: '.list .li:not(.on)', live: '.list .li:not(.on)' },
+  { el: 'main', board: 'main.main', live: 'main.main' },
+  { el: 'id band', board: 'main > .row.sb', live: 'main > .idband' },
+  { el: 'h1', board: 'main h1', live: 'main h1', text: true },
+  { el: 'h1 note', board: 'main h1 + .note', live: 'main h1 + .note', text: true },
+  { el: 'open button', board: 'main > .row.sb .btn.pri', live: 'main > .idband .btn.pri', text: true },
+  { el: 'refusal', board: 'main > .callout.deny', live: 'main > .callout.deny' },
+  { el: 'refusal title', board: 'main > .callout.deny .b', live: 'main > .callout.deny .b', text: true },
+  { el: 'refusal raw', board: 'main > .callout.deny > .m', live: 'main > .callout.deny > .m', text: true },
+  { el: 'refusal note', board: 'main > .callout.deny > .note', live: 'main > .callout.deny > .note', text: true },
+  { el: 'did you mean', board: 'main > .card.pad', live: '#did-you-mean' },
+  { el: 'did you mean title', board: 'main > .card.pad .h2', live: '#did-you-mean .h2', text: true },
+  { el: 'close table', board: 'main > .card.pad .card', live: '#did-you-mean .card' },
+  { el: 'close head cell', board: 'main > .card.pad .card .r.h > span', live: '#did-you-mean .card .r.h > span', text: true },
+  { el: 'close row', board: 'main > .card.pad .card .r.on', live: '#did-you-mean .card .r.on' },
+  { el: 'close open', board: 'main > .card.pad .card .r.on .btn', live: '#did-you-mean .card .r.on .btn', text: true },
+  { el: 'close note', board: 'main > .card.pad > .note', live: '#did-you-mean > .note', text: true },
+  { el: 'callouts', board: 'main > .row.g12', live: 'main > .row.g12' },
+  { el: 'deleted', board: 'main > .row.g12 > .callout', live: 'main > .row.g12 > .callout' },
+  { el: 'deleted title', board: 'main > .row.g12 > .callout .b', live: 'main > .row.g12 > .callout .b', text: true },
+  { el: 'register', board: 'main > .row.g12 > .callout .btn', live: 'main > .row.g12 > .callout .btn', text: true },
+];
+
+/** Sc-14: the registry switched off. */
+export const OFF: Probe[] = [
+  ...SHELL,
+  { el: 'list', board: '.list', live: 'aside.list' },
+  { el: 'list none', board: '.list > .col.g4', live: '.list .list-none' },
+  { el: 'list none title', board: '.list > .col.g4 > .b', live: '.list .list-none > .b', text: true },
+  { el: 'main', board: 'main.main', live: 'main.main' },
+  { el: 'id band', board: 'main > .row.sb', live: 'main > .idband' },
+  { el: 'h1', board: 'main h1', live: 'main h1', text: true },
+  { el: 'h1 note', board: 'main h1 + .note', live: 'main h1 + .note', text: true },
+  { el: 'copy button', board: 'main > .row.sb .btn.pri', live: 'main > .idband .btn.pri', text: true },
+  { el: 'off', board: 'main > .callout.warn', live: 'main > .callout.warn' },
+  { el: 'off title', board: 'main > .callout.warn .b', live: 'main > .callout.warn .b', text: true },
+  { el: 'off flag', board: 'main > .callout.warn .row .m', live: 'main > .callout.warn .row .m', text: true },
+  { el: 'cards', board: 'main > .row.g12', live: 'main > .row.g12' },
+  { el: 'turn on', board: 'main > .row.g12 > .card.grow', live: 'main > .row.g12 > .card.grow' },
+  { el: 'turn on title', board: 'main > .row.g12 > .card.grow .h2', live: 'main > .row.g12 > .card.grow .h2', text: true },
+  { el: 'commands', board: 'main > .row.g12 > .card.grow pre', live: 'main > .row.g12 > .card.grow pre', free: { text: 'the commands name this broker\'s data directory; the board names ./data', w: 'the commands name this broker\'s data directory' } },
+  { el: 'where', board: 'main > .row.g12 > .card:not(.grow)', live: 'main > .row.g12 > .sc-where' },
+  { el: 'where title', board: 'main > .row.g12 > .card:not(.grow) .h2', live: 'main > .row.g12 > .sc-where .h2', text: true },
+  { el: 'still', board: 'main > .card.pad', live: 'main > .card.pad' },
+  { el: 'still title', board: 'main > .card.pad .h2', live: 'main > .card.pad .h2', free: { text: 'the board marks the heading "new"; a page has no such tag', w: 'the board marks the heading "new"; a page has no such tag' } },
+  { el: 'still card', board: 'main > .card.pad .well', live: 'main > .card.pad .well' },
+  { el: 'still card title', board: 'main > .card.pad .well .b', live: 'main > .card.pad .well .b', text: true },
+];

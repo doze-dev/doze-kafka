@@ -4,19 +4,19 @@
   "modules": 422,
   "platforms": {
     "darwin/arm64": {
-      "binaryBytes": 28415122,
-      "idleHeapBytes": 1368256,
+      "binaryBytes": 28870418,
+      "idleHeapBytes": 1375088,
       "idleHeapNoiseBytes": 7304,
       "go": "go1.27.3",
-      "recorded": "2026-11-02",
+      "recorded": "2026-11-08",
       "where": "macOS 27, Apple M-series, native"
     },
     "linux/arm64": {
-      "binaryBytes": 27590816,
-      "idleHeapBytes": 1374400,
+      "binaryBytes": 28049568,
+      "idleHeapBytes": 1383880,
       "idleHeapNoiseBytes": 7160,
       "go": "go1.27.3",
-      "recorded": "2026-11-02",
+      "recorded": "2026-11-08",
       "where": "golang:1.27 container, linux/arm64, native on Apple M-series (Docker VM); idleHeapBytes from GitHub's linux/arm64 runner (CI run 41501006646)"
     }
   },
@@ -159,6 +159,286 @@
       "from": 1365104,
       "to": 1374400,
       "reason": "GitHub's linux/arm64 runner measures 1,374,400 (PR 3, CI run 41501006646, job Lightness budget (linux/arm64)), 9,296 above the 1,365,104 recorded in a local golang container on Apple silicon (the gate runs on the runner, so its figure is the budget); the new console code and the environment both contribute and how much each was not separated"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28481970,
+      "reason": "Stage 5 schema registry (schemas-stage5): Avro compatibility ported from Avro's own reader/writer rules (avrocompat.go), Confluent's sentences for JSON Schema and Protobuf reasons, the request log and sign-in throttle, body and nesting limits, Protobuf descriptor imports compiled from references, and stored schemas indexed under the current canonical form: 66,848 bytes (0.24%) over main 894c8b5 on darwin/arm64; which part grew by how much was not measured"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27656352,
+      "reason": "Stage 5 schema registry (schemas-stage5), the same code as the darwin/arm64 raise of this date: 65,536 bytes, one page of the linux/arm64 binary (built in golang:1.27.3 on linux/arm64, and measured the same by CI run 42275898340, job Lightness budget (linux/arm64), on the first commit that crossed it)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28481970,
+      "to": 28533266,
+      "reason": "Stage 5 schema registry, row 6 (85dd728): the /_doze/ extension routes (overview, version metadata, request ring, check at a level), the structured CompatReason beside Confluent's text, and the package-level sentence tables for JSON Schema and Protobuf reasons: binary 51,296 bytes over the 2026-11-07 record; idle heap median 1,372,960 over 20 starts against 1,371,224 earlier the same day (+1,736, the tables built at package load; the request ring is empty at idle)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28533266,
+      "to": 28533474,
+      "reason": "Console registry client (218aa6e): the registry-down backoff, oldest-first codec eviction and the once-each reference walk: 208 bytes"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28550354,
+      "reason": "Stage 5 schema registry (schemas-stage5, 135,232 bytes or 0.48% over main 894c8b5): the resolved view with the Avro inliner (16,880); Avro compatibility ported from Avro's own reader/writer rules (avrocompat.go), Confluent's sentences for JSON Schema and Protobuf reasons, the request log and sign-in throttle, body and nesting limits, Protobuf descriptor imports compiled from references, stored schemas indexed under the current canonical form (66,848 together); the /_doze/ extension routes, overview, version metadata, request ring and check at a level with CompatReason (51,296); the console registry client's backoff and once-each reference walk (208); measured at each step on darwin/arm64 natively"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28533474,
+      "to": 28550354,
+      "reason": "The schema registry's resolved view, with the Avro inliner (avroinline.go, the Resolved route): 16,880 bytes"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27656352,
+      "to": 27721888,
+      "reason": "The schema registry's resolved view, with the Avro inliner: one more 64 KiB page of the linux/arm64 binary (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27721888,
+      "reason": "Stage 5 schema registry (schemas-stage5) over main 894c8b5, two 64 KiB pages of the linux/arm64 binary: the same code as the darwin/arm64 raise from 28,415,122 to 28,550,354 of this date (one entry for the step the pull request's merge commit makes)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "linux/arm64 idleHeapBytes",
+      "from": 1374400,
+      "to": 1383880,
+      "reason": "Stage 5 schema registry (schemas-stage5): GitHub's linux/arm64 runner measured a median of 1,370,872 to 1,373,640 over five starts up to commit 8669fb1, and 1,376,992 to 1,380,328 from 21f219d on (CI runs for f73f379, 21f219d, 250473c, 1b81377), after the /_doze/ extension routes and the JSON Schema and Protobuf sentence tables, which are built at package load (the request ring is empty at idle); the budget is the largest single start the runner measured, 1,383,880 (250473c), as the 2026-11-03 raise took the runner's figure"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28550354,
+      "to": 28567442,
+      "reason": "Schemas Sc-01 and the registry's wire dock: the empty registry's page and its producer lines, the dock's registry source over /_doze/requests and its rows: 17,088 bytes (linux/arm64 unchanged at 27,721,888, built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-07",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28567442,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the 2026-11-07 raise from 28,415,122 to 28,550,354 and Sc-01 with the registry's wire dock (17,088)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28567442,
+      "to": 28702738,
+      "reason": "Schemas: the subject page (Sc-05, Sc-07, Sc-08, Sc-18) and the diff (Sc-06), the registry client's /_doze/ and mode calls, the change summaries and the boards' schema printing: 135,296 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28702738,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises of 2026-11-07 to 28,567,442 and the subject pages of 2026-11-08 (135,296)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27721888,
+      "to": 27852960,
+      "reason": "Schemas: the subject page (Sc-05, Sc-07, Sc-08, Sc-18) and the diff (Sc-06), the same code as the darwin/arm64 raise of this date: two 64 KiB pages (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27852960,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raise of 2026-11-07 to 27,721,888 and the subject pages of 2026-11-08 (131,072)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28702738,
+      "to": 28753010,
+      "reason": "Schemas: the register page (Sc-02 to Sc-04, Sc-10's references and resolved view), its check, refusal table and fix, and the registry's InlineAvro for a draft: 50,272 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28753010,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,702,738 and the register page of 2026-11-08 (50,272)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27852960,
+      "to": 27918496,
+      "reason": "Schemas: the register page, the same code as the darwin/arm64 raise of this date to 28,753,010: one 64 KiB page (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27918496,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 27,852,960 and the register page of 2026-11-08 (65,536)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 idleHeapBytes",
+      "from": 1368256,
+      "to": 1375088,
+      "reason": "Stage 5's Schemas pages (schemas-stage5, 2026-11-08): the median of 20 starts went from about 1,374,100 to 1,375,088 with the register page, after 1,373,360 with the subject pages; what grew at idle is package-level tables the pages add (key bindings, routes, form-field records, the subject's tabs), not templates (parsed on the first console request). The budget is the median of 20 starts, as the gate now judges (2026-11-08); it was 1,368,256, the largest of 20 at the time, and main's"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28753010,
+      "to": 28769714,
+      "reason": "Schemas: the Compatibility tab (Sc-09: levels, scope, mode, a check at a level) and read-only (Sc-15: the 42205 refusal, the mode); the per-subject check and register routes removed: 16,704 bytes (linux/arm64 unchanged at 27,918,496)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28769714,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,753,010 and the Compatibility tab of 2026-11-08 (16,704)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28769714,
+      "to": 28786546,
+      "reason": "Schemas: Sc-12's deletes (the soft delete of a version, the subject's two calls behind its typed name, the measured ids and messages) and the soft-deleted subjects (SCH-17): 16,832 bytes (linux/arm64 unchanged at 27,918,496)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28786546,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,769,714 and Sc-12's deletes of 2026-11-08 (16,832)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28786546,
+      "to": 28836882,
+      "reason": "Schemas: Used by (Sc-11, Sc-17: the ids the topic's messages carry, the undecoded ones), a subject not found (Sc-16) and the registry off (Sc-14): 50,336 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28836882,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,786,546 and Sc-11, Sc-14, Sc-16 and Sc-17 of 2026-11-08 (50,336)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27918496,
+      "to": 27984032,
+      "reason": "Schemas: Used by, not found and registry off, the same code as the darwin/arm64 raise of this date to 28,836,882: one 64 KiB page (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 27984032,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 27,918,496 and the pages of 2026-11-08 to 27,984,032 (65,536)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28836882,
+      "to": 28853442,
+      "reason": "Schemas: Sc-13 (the registry refusing the console), the registry's route ledger (each route recorded as registered), the inspector's soft delete: 16,560 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28853442,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,836,882 and Sc-13 and the route ledger of 2026-11-08 (16,560)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27984032,
+      "to": 28049568,
+      "reason": "Schemas: Sc-13 and the route ledger, the same code as the darwin/arm64 raise of this date to 28,853,442: one 64 KiB page (built in golang:1.27.3 on linux/arm64)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "linux/arm64 binaryBytes",
+      "from": 27590816,
+      "to": 28049568,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 27,984,032 and Sc-13 and the route ledger of 2026-11-08 to 28,049,568 (65,536)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28853442,
+      "to": 28870178,
+      "reason": "Schemas: the permanent delete's confirm counts soft-deleted versions and names the ids another subject keeps (TestDeleteConfirmsMatchTheRequests): 16,736 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28870178,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,853,442 and the delete confirm's shared ids of 2026-11-08 (16,736)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28870178,
+      "to": 28870370,
+      "reason": "Schemas: the registry down is its own refusal (registryUnreachable), not the broker's: 192 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28870370,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,870,178 and the registry-down refusal of 2026-11-08 (192)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28870370,
+      "to": 28870386,
+      "reason": "Schemas: the subject list from the overview (SCH-8), the register message (SCH-33), liveIds; the console's unused delete helpers removed: 16 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28870386,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,870,370 and the subject list and register message of 2026-11-08 (16)"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28870386,
+      "to": 28870418,
+      "reason": "Schemas: a topic lists the record-named subjects its newest records carry (SCH-26): 32 bytes"
+    },
+    {
+      "date": "2026-11-08",
+      "key": "darwin/arm64 binaryBytes",
+      "from": 28415122,
+      "to": 28870418,
+      "reason": "Stage 5 (schemas-stage5) over main 894c8b5, the step the pull request's merge commit makes: the raises to 28,870,386 and the record-named subjects on a topic of 2026-11-08 (32)"
     }
   ]
 }

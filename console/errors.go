@@ -52,7 +52,11 @@ func wantsPage(r *http.Request) bool {
 func (c *Console) fail(w http.ResponseWriter, r *http.Request, err error) {
 	f := refusalFor(err)
 	if wantsPage(r) {
-		c.renderError(w, r, f, errorPage{})
+		page := errorPage{}
+		if _, ok := errors.AsType[*registryUnreachable](err); ok {
+			page.Section = "schemas"
+		}
+		c.renderError(w, r, f, page)
 		return
 	}
 	c.refuse(w, f)

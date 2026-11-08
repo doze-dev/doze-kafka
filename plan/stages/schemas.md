@@ -14,7 +14,7 @@ Packages owned: `schemaregistry/` (REST handlers, avro/json/protobuf engines, `p
 
 What the audit found, in one paragraph: the registry is faithful where it was recorded and unprotected where it was not. Two requests can hold the registry-wide mutex for minutes (an exponential reference graph; a deeply nested Avro schema compared with a previous one), a 200 MB `PUT /config` body is accepted, any web page can `POST` a schema to a developer's registry (no `Content-Type` check, no Host guard that the console has), the Avro reasons in a 409 are not in the shape Confluent sends and `docs/schema-registry.md` says they are, and the console's delete hard-deletes in one click with a confirm that says less than it does.
 
-**Estimate:** L, 18 days (36 half-days), see section 11. **Actual:** _fill in when done._
+**Estimate:** L, 18 days (36 half-days), see section 11. **Actual:** sessions from 2026-11-06 to 2026-11-08 (the registry, recordings and client first; then the 19 boards and their gate; the proof items overnight on 2026-11-08). Not measured in days. Status by finding: [section 12](#12-status-of-this-pass).
 
 ## 2. Contract
 
@@ -142,7 +142,7 @@ Evidence: `run` = reproduced against a binary built from `main` at `970d829` on 
 | ID | Sev | What | Where | Ev | Src | Test first |
 |---|---|---|---|---|---|---|
 | SCH-24 | P2 | `decode` returns `(decoded, bool)`: an unknown id (`40403`), a registry that is off, a 401, a payload that does not match its schema and an unreachable registry all produce the same raw display, and the user is not told why. Boards Sc-14 ("shown raw, with the reason 'registry is off'") and Sc-17 ("40403, schema id 9") need the reason. The negative cache is 5 s for every error, so a table of unknown ids re-asks the registry for each id every 5 s, and the positive cache never refreshes the `subject, version` tag chosen when the id was first seen. The cache is cleared wholesale at 512 entries. | `console/registry.go:276-373` | read | doc | Console: decode a value with id 9 against a registry that has 1 to 8, assert `Reason{Kind:"not-found", Code:40403, ID:9}` in the drawer and the row; a value with a good id and a payload cut short gives `Reason{Kind:"mismatch"}`; registry down gives `Kind:"unreachable"` and no 5-second retry storm (one probe, then back off). |
-| SCH-26 | P2 | Naming strategies: the console only links `<topic>-key` and `<topic>-value` (`topicSchemas`). `RecordNameStrategy` and `TopicRecordNameStrategy` subjects register fine (the registry accepts any name) but the topic page shows no schema chip and the neighbours sentence of A5 has no subject for them; the tag in the drawer does find the subject, through `/schemas/ids/{id}/versions`, only when the message has been decoded. Board Sc-01 says "With RecordNameStrategy the subject is the record's full name ... Both work here." No `compat/` cell uses a non-default strategy (`SerdeCheck` sets none). | `handlers_schemas.go:284-300`, `compat/java/.../SerdeCheck.java` | read | doc | Compat cell: Java Avro serializer with `value.subject.name.strategy=RecordNameStrategy` and `TopicRecordNameStrategy`, round trip, then assert the console topic page lists the subject (find it through the ids seen in the topic, SCH-25). |
+| SCH-26 | fixed, red; clients fixed | `compat/java` and `compat/python`: `RecordNameStrategy` and `TopicRecordNameStrategy` round trips, plain and SCRAM over TLS. A subject's Used by tab looks for a subject named for no topic on every topic. A topic's Schema tab lists, besides `<topic>-key` and `<topic>-value`, the subjects named for no topic whose ids its newest 20 records a partition carry (read only when the registry holds such a subject): `TestATopicShowsTheRecordNamedSubjectsItsRecordsCarry` (red first; a subject named for another topic that shares the id is not listed). |
 | SCH-25 | P2 | The scan behind "Topics using it", "messages carry id N", "720 still on v1", the Sc-12 message counts and the Sc-17 undecoded list does not exist. It must read records, so it must be bounded (records, bytes, time) and say what it left unread, as Trace does (`console/trace_scan.go`). | new; model `console/trace_scan.go` | read | doc | Console: seeded topic with ids 7, 4, 1 and one 9; scan returns counts by id, the first and last offsets per id, and `Unread` when the budget stops it. Never scans a topic whose values lack the `0x00` prefix beyond the first 20 records (cheap reject). |
 | SCH-19 | P2 | Board Sc-13 ("Subjects not loaded: the registry answered 401") cannot happen with the built-in registry: the console signs in as `__console`, whose password is generated at start and is a registry user (`main.go:419-448`); `console.Options.RegistryURL` is set from the built-in registry only (`main.go:485`) and no flag points the console elsewhere. The board's "5 subjects exist" is unknowable from a 401. "The password is checked against SCRAM" is false: `server/registry.go:35` compares the cleartext map entry. A sign-in form needs a console session store, which the console does not have. | `cmd/doze-kafka/main.go:485`, `server/registry.go:33-37`, board Sc-13 | read | doc | Decision, not code: cut the sign-in form and the count; keep a "Refused, 401" page for an embedder who gives the console a bad registry credential, and write the test that the console shows it (httptest registry that always 401s). |
 | SCH-20 | P2 | Needs backend: per-version metadata. `versionRec` is `{subject, version, id, deleted}` (`registry.go:62`): no `createdAt`, no registering principal (basic-auth user), no remote address or `User-Agent`, and nothing about what it was checked against. Boards Sc-05 ("Registered", "Checked against"), Sc-06 (times in the headers), Sc-15 ("mode set at 14:21"), Sc-18 ("registered 14:36:15 by checkout-api") all show these. "By checkout-api" is a **guess**: HTTP carries no Kafka client id. Only the basic-auth user and the `User-Agent` are facts; correlating to a Kafka client by time and address is a traffic-stage inference and the board must say "probably". Mode and level also need `setAt`. | `registry.go:62-67`, `registry.go:437-459` | read | doc | Store: register, restart, read `createdAt`, `by`, `from`, `agent`; old records without the fields decode to zero values and render "unknown". Extension endpoint `GET /_doze/subjects/{s}/versions/{v}` returns them. |
@@ -378,3 +378,146 @@ Total 36 half-days. Smallest useful cut if time is short: rows 1 to 5 (13 half-d
 - **Karapace** (Aiven) is an open-source Confluent-compatible registry in Python; its test suite is a useful second source of REST edge cases when a recording is not yet made, as `memory` until recorded.
 - **Data contracts and schema linking** (Confluent) are declined here; the design does not draw them.
 - **Go's own `net/http` hardening** (`http.MaxBytesReader`, server timeouts) is the whole of the bounds work; no KIP applies, the registry is not part of Apache Kafka.
+
+## 12. Status of this pass
+
+What was done, by finding, against what this document asked. "Red" means the commit
+says the test failed on the code before the fix, or failed again with the fix reverted
+by hand. "Recorded (Rn)" means the Confluent 7.7.1 recording of section 8 decided the
+behaviour, and `TestConformance` replays it. "Foundation" means the work landed on main
+before this branch (2026-10-16) and this stage only checked it. Test names are the ones
+in the code; where the plan named a test that was never written under that name, the
+row says what holds it instead.
+
+| ID | State | Where it is tested |
+|---|---|---|
+| SCH-1 | fixed, red | Each `(subject, version)` is resolved once, at most 1,000 schemas a graph, no depth cap. `TestReferenceGraphIsLinear`: a 26-level diamond registers under 200 ms (24 levels took 3.1 s before). Recording R10 (`nested-references`) checks the diamond and a chain past 32 against Confluent. |
+| SCH-2 | fixed, red | Avro and JSON Schema nest at most 256 JSON levels, refused at once without echoing the schema. Avro is now checked by a port of Avro's own rules (`avrocompat.go`), not hamba's check, whose cost grew with the square of the depth. `TestNestingIsBounded` (a 3,000-deep schema took 17.9 s before). No per-request deadline for `compare` was built: the nesting cap stands in for the plan's `TestCompareHasADeadline`. |
+| SCH-3 | fixed, red | Bodies are limited to 20 MiB for schemas and 64 KiB for `/config` and `/mode` (413). `TestBodiesAreBounded` (a 20 MiB `PUT /config` and `/mode` answered 200 before). Recording R8 (`large-bodies`), with the limits listed as differences on purpose. The heap is not measured; the body is refused before it is read. |
+| SCH-4 | fixed, red (foundation) | `internal/hostguard`, shared by console and registry (f0b7f75; every test failed with the check off). The plan's `TestHostGuard` is these: `schemaregistry/hostguard_test.go` (`TestARequestForAForeignHostIsRefusedAndChangesNothing`, `TestLookalikeHostsAreRefused`, `TestTheHostIsJudgedBeforeTheCredentials` and two more), `internal/hostguard` (`TestAllowed` and four more, `FuzzHostGuard`), `server/registry_host_test.go`, `cmd/doze-kafka/registry_hostguard_test.go`. |
+| SCH-5 | fixed, recorded (R4) | `text/plain`, form, multipart and XML bodies are 415, as Confluent answers. The replay of `content-types` found it. The plan's `TestContentTypeIsChecked` is that scenario under `TestConformance`; `FuzzAPIBody` sends random content types. |
+| SCH-6 | fixed, recorded (R9) | Confluent's reasons for every refusal of the 1,459-pair corpus (`testdata/compat/*-reasons.json`). `TestCorpusReasons`: 2,287 of 2,291 match word for word; the four that do not give the same verdict and are listed with why. `TestConformance` now compares 409 `details` and verbose `messages` in full. Reasons taken apart (`CompatReason`): `TestCheckAtLevel`. `compat/java`: the 409 carries `READER_FIELD_MISSING_DEFAULT_VALUE` at `/fields/2`. `docs/schema-registry.md` "Where it differs" says so. |
+| SCH-7 | fixed, recorded (R11) | A descriptor that imports another file registers with its reference (`protobuf-descriptor-with-import`, replayed). `compat/python`: `ProtobufSerializer` on a message that imports another file, plain and SCRAM over TLS. `TestOldCanonicalFormsAreStillFound` (red) keeps stored schemas at their old ids after the printing change. |
+| SCH-8 | fixed, red; registry recorded (R6) | Confluent honours `limit` and `offset` on `GET /schemas` only and ignores them on `/subjects` (`limit-and-offset`, replayed); the registry does the same. The console draws its subject list from `/_doze/overview`, which carries no schema text, and reads `GET /schemas` only from a registry without the overview: `TestSubjectListIsDrawnWithoutEverySchemasText` (red: every page asked for `/schemas`; it also found the list's foot counting a schema two subjects share twice). The overview gained `liveIds` for the foot's "id 9 is not in use here". Not built: a "500 of 600" cut of the list itself. |
+| SCH-9 | fixed | One log record per request (401, 403, 409 at info, 5xx as a warning, the rest at debug; method, path, status, user, address, duration; never a password). `TestErrorsAreLogged`. |
+| SCH-10 | fixed, red | Read timeout 30 s, idle 2 minutes. `TestRegistryTimesOutSlowAndIdleClients` (it fails with the old server). This is the plan's `TestRegistryTimeouts`. |
+| SCH-11 | fixed, red (foundation) | The registry serves HTTPS with the broker's certificate; `--schema-registry-tls=false` keeps it plain (3840d1a, reverted by hand, the tests fail). The plan's `TestRegistryTLS` is `cmd/doze-kafka/registry_tls_test.go`: `TestTheRegistryIsServedOverTLSWithTheBrokersCertificate`, `TestTheRegistryTakesBasicAuthOverTLS`, `TestTheRegistryCanStayPlainBesideATLSBroker` and four more. `TestSecondIdentity` registers over the TLS registry with basic auth under SCRAM. `docs/auth-and-tls.md` covers it. |
+| SCH-12 | fixed, red | `Server.SchemaRegistry` returns one handler. `TestSchemaRegistryIsOneInstance` (two handlers gave id 1 to two schemas before). |
+| SCH-13 | fixed | `Open` names the bad record (`TestOpenWithABadRecord`, `TestSchemaRegistryWithAnUnreadableRecord`); the broker starts with the registry off and says why (`TestBrokerStartsWithAnUnreadableRegistry`); the Schemas page gives the reason (`TestRailKeepsSchemasWhenOff`). A taken port is still fatal. |
+| SCH-14 | fixed, recorded (R3) | Confluent's check ignores READONLY (`readonly-subject`), so the registry's check stays as it is and the console warns: the register page and the check say "Register will be refused with 42205" (`TestCompatibilityTab`, e2e "a read-only subject refuses a new version"). Check and register agree: `TestCheckEqualsRegister`. |
+| SCH-15 | fixed (foundation's refusals) | The page carries the registry's code as the refusal's name (409, 42205). `TestRefusalsKeepTheRegistryCode` guards it. |
+| SCH-16 | fixed, red | A version's delete is the soft delete alone; a subject's is soft then permanent, behind the typed name. `TestDeleteConfirmsMatchTheRequests`, against a real registry with a shared id and a client-soft-deleted version: it found that the permanent confirm counted only live versions and called a shared id lost. Design gate Sc-12 holds both dialogs; e2e "a version is soft-deleted ... deleted for good from there". |
+| SCH-17 | fixed | A client-soft-deleted subject is listed under Soft-deleted with Delete for good (the permanent call alone). `TestSoftDeletedSubjectIsListedAndRemovable`, e2e as SCH-16. |
+| SCH-18 | fixed, red, recorded (R7) | A subject over 16 KiB, with a control character, or named `__GLOBAL` is 42208 and is not echoed. `TestSubjectLengthIsBounded` (the plan's `TestSubjectLengthAndCharacters`; a 40,000-character subject was accepted before) and `subject-names`, replayed. |
+| SCH-19 | cut by decision | The owner cut the sign-in form and the subject count. Sc-13 keeps the 401 page, the user the console signs in as, Try again and the `curl` by hand: `TestRegistryRefusesTheConsole` (not in the design gate: a broker whose registry refuses its own console cannot be made). |
+| SCH-20 | fixed | A version keeps when it was registered and the user, address and `User-Agent`; a level and a mode keep when they were set. `TestVersionMetadataSurvivesRestart`, `TestOldRecordsWithoutMetadata`, `TestVersionMetadataOverHTTP`, and `TestTheRegistrySurvivesASIGKILL` (a hand mutation dropping the stored user fails it). Sc-18's "By" is the `User-Agent`'s software; a Kafka client name would be a guess (plan/00-foundation.md). |
+| SCH-21 | fixed | The newest 2,000 requests, never a body, by subject including requests by id, under `/_doze/requests`. `TestRequestRingBounds`; the console's reads stay out (`TestConsoleReadsAreLeftOutOfTheRegistryLog`); every Schemas page ends with it (`TestTheSchemasDockIsTheRegistrysOwnLog`). |
+| SCH-22 | fixed | Check at any level, the subject's left as it is (`TestCheckAtLevel`); resolved view with Avro types written out (`TestInlineAvro`, `TestInlineAvroEveryNamedKind`, `TestInlineAvroForADraft`). |
+| SCH-23 | fixed | `GET /_doze/overview`. `TestOverviewNextIDMatchesRegister`, after a permanent delete of the highest id and a restart. |
+| SCH-24 | fixed | `decodeState` says not framed, unknown id, registry not reached, or body does not fit. A registry that is down is probed once and then left 1 s, doubling to 30 s; an unknown id is kept 30 s; a full cache drops its oldest (`TestUnknownIDBackoff`: 200 values, one probe; `TestCodecCacheDropsTheOldestPast512Entries`). Unknown id in the inspector: `TestInspectorFramedWithAnUnknownIDSaysSo` (TOP-38) and e2e "a message with an id the registry never held". The "does not fit" reason (`framedMismatch`) has no test of its own. |
+| SCH-25 | fixed | `scanSchemaIDs` on Trace's bounded reader (50,000 records, 5 s, gives up after 20 unframed values, says what it left unread): `TestTopicScanCountsSchemaIDs`. On the pages: Used by, Sc-11 and Sc-17 (`TestUsedByTab`, design gate). |
+| SCH-26 | **open (console)**, clients fixed | `compat/java` and `compat/python`: `RecordNameStrategy` and `TopicRecordNameStrategy` round trips, plain and SCRAM over TLS. A subject's Used by tab looks for a subject named for no topic on every topic. The topic page still links only `<topic>-key` and `<topic>-value` (`topicSchemas`); the plan's test, the topic page listing a record-named subject through the ids it carries, does not exist. |
+| SCH-27 | fixed, recorded (R5) | `basic-authentication`, replayed: 401 with a challenge on every route, `/` and unknown paths included. `TestSchemaRegistryAuthWiring` (a SCRAM-only broker's user over Basic; `/`, a missing route), `TestSchemaRegistryUsesTheBrokersCredentials`, `TestExtensionRoutesAreAuthenticated`. The console signing in under SCRAM is held by `TestSecondIdentity`. `docs/auth-and-tls.md`: "authenticates and does not authorise". |
+| SCH-28 | fixed | `FuzzAPIBody`, `FuzzDescriptor`, `FuzzRegisterReferences` (foundation B12, a 5 s per-iteration deadline) and `FuzzSchemaForms` (this stage: every Schemas form with a registry beside the console, 1.3M inputs in 60 s), all in `testdata/fuzz-targets.txt`. The uncapped variant of `FuzzRegisterAndCompare` was not made; it still skips inputs over 16 KiB, and depth is held by `TestNestingIsBounded` instead. |
+| SCH-29 | recorded (R1 to R14) | 14 scripts in `schemaregistry/testdata/conformance` and R9 as `testdata/compat/*-reasons.json`, replayed by `TestConformance` and `TestCorpusReasons` with no step answered differently except those in `knownDifferences` and `corpusReasonDifferences`, each with its reason. |
+| SCH-30 | fixed | The console shows the registry's own message (`Subject X is in read-only mode`, as recorded) in the Sc-15 refusal: `TestRefusalsKeepTheRegistryCode`, `TestCompatibilityTab`. The board file is kept byte-exact and still quotes the wrong text; the gate does not compare that line. The B14-style doc test over quoted error strings was not written. |
+| SCH-31 | fixed, recorded (R3) | Confluent refuses a level change in a READONLY subject (`readonly-subject`), and now so does this registry, so the board's sentence is true. Replayed by `TestConformance`. |
+| SCH-32 | fixed | The rail keeps Schemas, marked off; the page gives `--data-dir` and no sentence about giving the console a registry. `TestRailKeepsSchemasWhenOff`, e2e "the rail keeps Schemas, marked off", design gate Sc-14 on a broker started with `--schema-registry=false`. |
+| SCH-33 | fixed, red | A register says what it did: "Registered v2, id 2"; "Already registered as v1, id 1: nothing was created"; "Registered v1 with id 1, the id this schema already has under orders-value"; "... the id this schema had in a deleted version". `TestRegisterSaysWhatItCreated` (the plan's `TestRegisterSaysAlreadyRegistered`; every case said "Schema registered" before). |
+| SCH-34 | fixed | One selection of versions and one comparison (`versionsAt`, `findings`) for register and check. `TestCheckEqualsRegister` over the whole corpus at BACKWARD, FORWARD, FULL and FULL_TRANSITIVE. |
+| SCH-35 | recorded (R12), documented | `unserved-routes-and-parameters`: `/contexts` and the metadata endpoints are 404 here, listed in `knownDifferences`, in docs/schema-registry.md "Where it differs", in docs/limitations.md, and as S rows in docs/api-support.md (`TestEveryRegistryRouteHasALedgerRow`). No compat cell's tool was seen to call them, so no cell assertion was added. |
+| SCH-36 | fixed | `refsString` matches Confluent's form (`TestRefsStringIsConfluents`; the hash stays `0`, Confluent's is a Java object hash); `codeUnsupportedMediaType` is used (SCH-5); the unused `codeInternal`, `codeMethodNotAllowed` and `codeUnprocessable` are gone. The console's `DeleteVersion` and `DeleteSubject`, which sent the soft and permanent delete back to back and which no handler called after SCH-16, are gone with their test. |
+| SCH-37 | fixed, recorded (R7), documented | Control characters and `__GLOBAL` are 42208. A space is a subject, as in Confluent. Contexts are not supported: `:.ctx:orders` is a literal subject, listed in `knownDifferences` and docs/schema-registry.md. `subject-names`, replayed. |
+| SCH-38 | fixed | After five refused sign-ins in a row from one address, each further one waits 100 ms longer, up to 2 s; a success clears it. Each is logged. `TestRepeatedSignInFailuresAreSlowed`, `TestErrorsAreLogged`. |
+
+**Open, with what is missing.** None.
+
+### Plan test names and the tests that hold them
+
+Section 7, unit and store (`schemaregistry`):
+
+- `TestReferenceGraphIsLinear`: exists.
+- `TestNestingIsBounded`: exists. `TestCompareHasADeadline`: not written; the nesting cap in `TestNestingIsBounded` holds the time instead, and there is no deadline.
+- `TestSubjectLengthAndCharacters`: `TestSubjectLengthIsBounded` (length) and the `subject-names` recording (characters).
+- `TestOpenWithABadRecord`: exists.
+- `TestStructuredFindingsRenderConfluentFormat`: `TestCorpusReasons` and `TestConformance` (Confluent's text), `TestCheckAtLevel` (the reasons taken apart).
+- `TestCheckEqualsRegister`: exists.
+- `TestVersionMetadataSurvivesRestart`, `TestOldRecordsWithoutMetadata`: exist.
+- `TestOverviewNextIDMatchesRegister`: exists.
+- `TestInlineAvro`, `TestCheckAtLevel`: exist.
+- `TestIDNotReusedAfterHardDeleteAndRestart`: `TestOverviewNextIDMatchesRegister` (a register after a permanent delete of the highest id and a restart), `TestTheRegistrySurvivesASIGKILL` (the highest id stays spent), and `permanent-delete-and-register-again` (R1).
+- `TestVersionNumberAfterPermanentDeleteOfLatest`: `permanent-delete-and-register-again` (R1), replayed.
+- `TestRequestRingBounds`: exists.
+- Coverage functions: `TestAccessorsSayWhatTheyHold`, `TestProtoExtendIsPrinted`, `TestJSONAdditionalItemsAndDependencies`, `TestRefsStringIsConfluents`, `TestExtensionRoutesOverHTTP` and others (28ce5e5).
+
+Section 7, HTTP layer:
+
+- `TestBodiesAreBounded`: exists.
+- `TestContentTypeIsChecked`: `content-types` (R4) under `TestConformance`.
+- `TestHostGuard`: `schemaregistry/hostguard_test.go` and `internal/hostguard` (see SCH-4).
+- `TestPaginationParameters`: `limit-and-offset` (R6) under `TestConformance`.
+- `TestErrorsAreLogged`: exists.
+- `TestAuthFailuresAreLoggedAndDelayed`: `TestRepeatedSignInFailuresAreSlowed` and `TestErrorsAreLogged`.
+- `TestEveryRouteRequiresAuth`: `basic-authentication` (R5), `TestSchemaRegistryAuthWiring`, `TestBasicAuthIsRequiredWhenConfigured`.
+- `TestUnsupportedRoutesAnswerJSON404`: `unserved-routes-and-parameters` (R12) and `TestEveryRegistryRouteHasALedgerRow`.
+- `TestExtensionRoutesAreAuthenticated`: exists.
+- `TestReadonlyAndConfig`: `readonly-subject` (R3).
+
+Section 7, `server` and `cmd`:
+
+- `TestSchemaRegistryIsOneInstance`, `TestSchemaRegistryAuthWiring`, `TestBrokerStartsWithAnUnreadableRegistry`: exist.
+- `TestRegistryTimeouts`: `TestRegistryTimesOutSlowAndIdleClients`.
+- `TestRegistryTLS`: `cmd/doze-kafka/registry_tls_test.go` (`TestTheRegistryIsServedOverTLSWithTheBrokersCertificate` and six more).
+
+Section 7, client library:
+
+- Unknown id shows 40403 in the drawer: `TestInspectorFramedWithAnUnknownIDSaysSo` (the record is sent through the console's composer, not franz-go).
+- A value cut short shows "mismatch": `TestInspectorSaysWhenTheBodyDoesNotFitItsSchema`.
+- Decode differential over the corpus pairs: `TestCompatibleMeansReadable`. For every Avro pair the recording calls BACKWARD compatible, a value written with the old schema reads with the new (hamba's resolution), and for every FORWARD one the reverse: 471 directions read back; 5 pairs with a named type used again are left out, because hamba's `Resolve` does not end on a recursive schema. Run over the incompatible pairs instead, 293 directions fail to read, so the test tells the two apart.
+
+Section 7, compat cells:
+
+- Java and Python `RecordNameStrategy` and `TopicRecordNameStrategy`: done. Python `ProtobufSerializer` with an import: done. READONLY refused with 42205: Java and Python. Java unknown id fails with 40403: done.
+- Wrong basic-auth password (401, under SCRAM/TLS, where the registry asks for one), `use.latest.version=true` with `auto.register.schemas=false` (the latest id, nothing registered), `normalize.schemas=true` (a held schema keeps its id): Java and Python.
+- `kcat -s avro -r`: done (580b1d2; `scripts/install-kcat.sh` builds libserdes).
+- Kafbat UI and Redpanda Console list the subjects, load the latest version, and show an Avro record decoded through the registry (written by the Kafka container's console producer: `avro_record` in compat/lib.sh): done, plain and SCRAM/TLS.
+
+Section 7, fuzz:
+
+- `FuzzRegisterReferences`, `FuzzDescriptor`, `FuzzAPIBody`: exist (foundation B12), in `task fuzz`.
+- Uncapped `FuzzRegisterAndCompare` with a 2 s deadline: **missing** (still capped at 16 KiB).
+- `FuzzSchemaFromForm`: `FuzzSchemaForms`.
+
+Section 7, console:
+
+- `TestRefusalsKeepTheRegistryCode`, `TestDeleteConfirmsMatchTheRequests`, `TestSoftDeletedSubjectIsListedAndRemovable`, `TestUnknownIDBackoff`, `TestRailKeepsSchemasWhenOff`: exist.
+- `TestCheckShowsReadonly`: `TestCompatibilityTab` (its Sc-15 part).
+- `TestSubjectListIsBounded`: `TestSubjectListIsDrawnWithoutEverySchemasText` (SCH-8).
+- `TestDecodeReasons`: `TestInspectorFramedWithAnUnknownIDSaysSo` and `TestUnknownIDBackoff`; the mismatch reason is untested.
+- `TestTopicScan*`: `TestTopicScanCountsSchemaIDs`.
+- `TestRegisterSaysAlreadyRegistered`: `TestRegisterSaysWhatItCreated` (SCH-33).
+- `TestSchemasPageAfterTheRegistryGoesAway`: `TestSchemasPagesWithTheRegistryDownOrEmpty` (red first: the pages said "Can't reach the broker").
+- One test per board: the design gate `e2e/design/schemas` on its world of the boards' subjects, and console tests for the boards the gate cannot reach (`TestSchemasNoneIsSc01`, `TestRegistryRefusesTheConsole`).
+
+Section 7, e2e: `e2e/tests/schemas.spec.ts` has 21 tests (target 20): refused 409, READONLY, soft then permanent delete, references and the resolved view, Protobuf evolution, JSON Schema properties, the unknown id, the registry off, the global level, the keys, 960 and 390 px, Try it and Raw. A subject a client soft-deleted is covered in `console` tests, not e2e. The broker down (A7) is the disconnected sweep, which visits a subject not found.
+
+Section 10, Behaviour:
+
+- The `go test ./schemaregistry -run` list: as mapped above. The commits say red first for `TestReferenceGraphIsLinear`, `TestNestingIsBounded`, `TestBodiesAreBounded` and the host-guard tests; not for `TestCheckEqualsRegister`.
+- 26-level diamond under 200 ms, depth 3,000 under 1 s, 20 MiB `PUT /config` is 413: `TestReferenceGraphIsLinear`, `TestNestingIsBounded`, `TestBodiesAreBounded`. The heap is not measured.
+- `Host: evil.example.com` is 403, one guard: see SCH-4.
+- `text/plain` refused as recorded: `content-types` (R4).
+- `go test ./server -run TestSchemaRegistry`: `TestSchemaRegistryIsOneInstance`, `TestSchemaRegistryAuthWiring`, `TestSchemaRegistryWithAnUnreadableRecord`. The console's own user is not asserted in `server`; `TestSecondIdentity` holds it end to end.
+- Logs and timeouts: `TestErrorsAreLogged`, `TestRegistryTimesOutSlowAndIdleClients`.
+- Restart and SIGKILL keep ids, versions, levels, modes and the new fields: `TestEverythingSurvivesARestart`, `TestVersionMetadataSurvivesRestart`, `TestTheRegistrySurvivesASIGKILL`.
+- Data directory with a space, console under a prefix, SASL and TLS on: `TestSecondIdentity` and `TestTheRegistrySurvivesASIGKILL` (a path with a space); SASL and TLS off: the rest of `cmd/doze-kafka/registry_test.go`.
+- `--schema-registry=false`: `TestRailKeepsSchemasWhenOff` and `TestTheRegistryBucketIsIntactAfterAStartWithTheRegistryOff`.
+
+Section 10, Proof:
+
+- Coverage: `schemaregistry` 92.1%, `server` 94.5%, `console` 94.1% (each package's own tests, `go test -cover`, 2026-11-08); `server/registry.go` 100% (28ce5e5).
+- Mutation: `schemaregistry` checked and re-recorded on 2026-11-08 (1,055 mutants: 781 killed, 102 lived, 31 not covered). Seven survivors were killed by new tests at the limits (`TestLimitsHoldExactlyAtTheLimit`, `TestTheRequestRingHoldsExactlyItsBound`, `TestOverviewIDsAreRuns`, `TestResolvedWithoutReferencesIsNotInlined`, `TestALimitOfZeroIsNoLimit`); the 40 new survivors are in `testdata/mutation.json` with reasons (equivalent ones say why; those in the compatibility engines say no recorded case separates them). The 96 older entries still marked "open" are from before this stage. `console` re-recorded on 2026-11-08 at 4a72c80 at the owner's request (4,397 mutants, 4 workers, 5.8 hours; the 36 timeouts are re-run one at a time at twice the time, which took the last 2.4 hours). It left 511 new survivors (466 lived, 113 not covered, 36 timed out, overlapping the old 102 only by 7). All 511 were triaged the same day, by eight Sonnet agents on one batch of files each, every kill red first by applying the mutant by hand: 398 are killed by 30 new test files, 39 do not compile (a `-` on strings, in lines no test had run; the new tests run those lines), and the other 178 carry reasons (equivalent, unreachable, hang, accepted, cosmetic). The counts in the baseline's header are adjusted for the kills by hand; the next `mutate:record` will measure them. No mutant exposed a bug in the source.
+- Fuzz: `FuzzRegisterReferences`, `FuzzDescriptor`, `FuzzAPIBody` and `FuzzSchemaForms` (the plan's `FuzzSchemaFromForm`) each ran 60 s clean on 2026-11-08; all four are in `task fuzz`.
+- Differential: R1 to R14 recorded and replayed, differences on purpose listed. The count of claims still at `memory` is not yet written in section 8.
+- Compat: every cell the plan names is written and passes plain and SCRAM over TLS (see the compat cells above).
+- Lightness: binary budgets raised with reasons in `testdata/lightness.json` (7842097, 1f1ffed, 21f219d, 70f0ef1 and others); idle heap judged by the median (53ce6db). `task api`: `server` API unchanged (CHANGELOG).

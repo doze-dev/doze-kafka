@@ -31,13 +31,11 @@ const (
 	codeOperationNotPermitted = 42205
 	codeReferenceExists       = 42206
 	codeInvalidRequest        = 42207
+	codeInvalidSubject        = 42208
 	codeStore                 = 50001
-	codeInternal              = 500
 	codeUnauthorized          = 401
 	codeForbidden             = 403
 	codeNotFound              = 404
-	codeMethodNotAllowed      = 405
-	codeUnprocessable         = 422
 	codeUnsupportedMediaType  = 415
 )
 

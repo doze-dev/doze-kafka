@@ -20,8 +20,10 @@ export const PAGES: Record<string, string[]> = {
   '/trace': ['trace', `trace?id=${TRACE}`],
   '/traffic': ['traffic', 'traffic?kind=errors', 'traffic?view=clients', 'traffic?open=request:no-such-row'],
   '/schemas': ['schemas'],
-  '/new/schema': ['new/schema'],
-  '/schemas/{subject}': ['schemas/seed-events-value', 'schemas/seed-events-value?tab=compat', 'schemas/seed-events-value?tab=register', 'schemas/no-such-subject'],
+  '/new/schema': ['new/schema', 'new/schema?subject=seed-events-value'],
+  '/schemas/{subject}': ['schemas/seed-events-value', 'schemas/seed-events-value?tab=compat', 'schemas/seed-events-value?tab=used', 'schemas/seed-events-value?tab=raw',
+    'schemas/seed-events-value?version=1&open=version:seed-events-value:1', 'schemas/seed-proto-value', 'schemas/no-such-subject'],
+  '/schemas/{subject}/diff': ['schemas/seed-events-value/diff', 'schemas/seed-events-value/diff?from=1&to=2&layout=unified'],
   '/groups': ['groups'],
   '/groups/{id}': ['groups/g-lag', 'groups/g-lag?tab=members', 'groups/g-lag?tab=timeline', 'groups/g-reset-latest?tab=offsets', 'groups/g-timeline', 'groups/no-such-group'],
   '/connect': ['connect'],
@@ -33,6 +35,7 @@ export const PAGES: Record<string, string[]> = {
 // The routes that are not pages, each with what it is; each is drawn inside a page
 // above, or a state below, and is swept there.
 export const PARTIALS: Record<string, string> = {
+  '/schemas/{subject}/open-id': 'a redirect to the newest message on a schema id (Sc-11\'s Try it); schemas.spec drives it',
   '/static/': 'the stylesheet, scripts and fonts',
   '/live/topics': 'Tp-Home\'s table, swept on topics',
   '/new/topic/shell': 'the create form\'s command, swept on new/topic',

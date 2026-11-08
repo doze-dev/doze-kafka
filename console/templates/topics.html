@@ -666,7 +666,7 @@
   <a class="r" href="{{.URL}}" data-row><span class="m b">{{.Subject}}</span><span class="m">{{.TypeLabel}}</span><span class="m ra">v{{.Version}}</span></a>
   {{end}}
 </div>
-<div class="note">A topic's key and value schemas are the subjects named <span class="m">&lt;topic&gt;-key</span> and <span class="m">&lt;topic&gt;-value</span>. Open one for its versions, what changed and its compatibility level.</div>
+<div class="note">A topic's key and value schemas are the subjects named <span class="m">&lt;topic&gt;-key</span> and <span class="m">&lt;topic&gt;-value</span>{{if hasRecordSubject .Schemas}}; a subject named for its record (RecordNameStrategy) is listed when the topic's newest records carry its schema id{{end}}. Open one for its versions, what changed and its compatibility level.</div>
 {{end}}
 
 {{/* topic_addparts (Tp-17): growing a topic. The form asks the new TOTAL (TOP-30), shows

@@ -399,13 +399,13 @@ span.num {
 /* Ac-Home's wire: time, client, the request and what it was about, the result. */
 .dock-acl .r { --c: 92px 120px 1fr 190px; }
 /* Tp-05's six columns: time, client, request, detail, result, took. */
-.dock:not(.dock-acl) .r { --c: 92px 120px 100px minmax(120px, 1fr) 60px 48px; }
+.dock:not(.dock-acl):not(.dock-reg) .r { --c: 92px 120px 100px minmax(120px, 1fr) 60px 48px; }
 /* With a selection open beside it (Tp-06), the page is 576 px and the six need 634:
    Tp-06's five, time 92, client 110, request 80, detail, result 40; the time it took is
    in the request's inspector. */
 @media (min-width: 1101px) {
-  body:has(#inspector:not([hidden])) .dock:not(.dock-acl) .r { --c: 92px 110px 80px minmax(0, 1fr) 40px; }
-  body:has(#inspector:not([hidden])) .dock:not(.dock-acl) .r > .took { display: none; }
+  body:has(#inspector:not([hidden])) .dock:not(.dock-acl):not(.dock-reg) .r { --c: 92px 110px 80px minmax(0, 1fr) 40px; }
+  body:has(#inspector:not([hidden])) .dock:not(.dock-acl):not(.dock-reg) .r > .took { display: none; }
 }
 
 .keys {
@@ -1672,3 +1672,100 @@ progress.gr-used::-moz-progress-bar{background:var(--ink);border-radius:2px}
 
 /* Topics, slice 4: the Config tab's row being edited (Tp-19). */
 .card .r.editing { background: var(--sel, rgba(120, 140, 255, .08)); }
+
+/* ---- Schemas (Sc-01 .. Sc-18) ---- */
+/* The registry's wire dock: the board's five columns, a refusal's row tinted. */
+.dock.dock-reg .r { --c: 100px 60px 1fr 70px 60px; }
+.dock.dock-reg .r.h { min-height: 26px; }
+.dock.dock-reg .r:not(.h) { min-height: 28px; }
+/* The boards draw the registry's dock with its header row and up to three requests. */
+.dock.dock-reg { max-height: 141px; }
+.dock.dock-reg .r.denyrow { background: var(--denybg); }
+.dock.dock-reg .r.badrow { background: var(--badbg); }
+/* Sc-01: nothing registered. */
+.main.sc-none-main { gap: 12px; }
+.sc-none-lead { padding: 16px 18px; gap: 6px; }
+.sc-none-side { width: 380px; flex: none; }
+.sc-none-side .btn { align-self: flex-start; margin-top: 4px; }
+.sc-none pre.sc-props { margin: 0 0 0 28px; }
+.code .kw { color: var(--deny); }
+:root:not([data-theme="contrast"]) .sc-none span.num { background: #17191c; color: #ffffff; }
+/* Sc-05, Sc-07, Sc-08, Sc-18: one subject. */
+.main.sc-main { gap: 10px; }
+.sc-pair > pre.code { margin: -4px 0 0; }
+.sc-pull { margin-top: -4px; }
+.sc-side { width: 360px; flex: none; margin-top: -4px; }
+.sc-props { width: 400px; flex: none; }
+.sc-props > .card { margin-top: -2px; }
+.sc-client-note { width: 420px; flex: none; }
+.sc-raw { white-space: pre; overflow: auto; }
+.sc-bytes { white-space: pre-wrap; word-break: break-all; margin: 0; }
+.try-pill { display: contents; }
+.sc-client { gap: 4px; }
+.versionb .sc-msg { padding: 7px 10px; text-decoration: none; }
+.versionb .kv a { text-decoration: none; }
+/* Sc-06: two versions side by side; each row a line, the changed ones tinted. */
+.sc-diff .r:not(.h) { min-height: 21px; }
+.sc-diff .r > .dl-del { background: var(--badbg); }
+.sc-diff .r > .dl-add, .sc-diff .r.dl-add { background: var(--okbg); }
+.sc-diff .r.dl-del { background: var(--badbg); }
+.sc-diff .r > .dl-none { background: var(--well); }
+.sc-vsel { width: 90px; }
+.nbwell.sc-nb { padding: 7px 12px; }
+.sc-text { line-height: 19px; }
+#try-result:not(:has(*)) { display: none; }
+/* Sc-02 to Sc-04, Sc-10: the register page. The form is the page's column: its card, the
+   answer and the actions are main's own rows. */
+.sc-reg-form { display: contents; }
+.sc-opt { width: 330px; flex: none; }
+.sc-seg { align-self: flex-start; }
+.sc-seg label { cursor: pointer; }
+.sc-seg label:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: -2px; }
+/* The schema field and its line numbers (Sc-02): a gutter beside a textarea that is
+   the board's .code. The textarea grows with its lines; the gutter follows it. */
+.sc-code { gap: 0; align-items: stretch; }
+.sc-gutter { border-right: 0; border-radius: 4px 0 0 4px; color: var(--mut); text-align: right; margin: 0; flex: none; user-select: none; }
+.sc-editor { border-radius: 0 4px 4px 0; margin: 0; resize: vertical; min-height: 228px; field-sizing: content; line-height: 19px; color: var(--ink); }
+.sc-editor:focus { outline: 2px solid var(--ink); outline-offset: -2px; }
+.sc-refs-none { padding: 7px 10px; }
+.sc-refs { margin-top: 0; }
+.sc-ref-new .inp { flex: 1; min-width: 0; }
+.sc-ref-new .sc-ref-v { flex: none; width: 56px; }
+.sc-findings .r:not(.h) { min-height: 34px; }
+.sc-wrap { white-space: normal; overflow-wrap: anywhere; }
+.sc-reg-form .btn:disabled { opacity: .55; }
+.sc-refs-few { min-height: 20px; }
+/* Sc-09: the levels as a table of choices, the scope and the mode beside it. */
+.sc-levels label.r { min-height: 34px; cursor: pointer; }
+.sc-levels label.r input { margin: 0; }
+.sc-side-wide { width: 360px; flex: none; }
+#compat-form .callout .seg { align-self: flex-start; }
+.linkbtn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+.sc-ro .seg { align-self: flex-start; }
+.sc-ro-btn { align-self: flex-start; margin-top: 4px; }
+#level-answer:not(:has(*)) { display: none; }
+/* Sc-12: the request under the confirm's title, its parts, the typed name. */
+.confirm-calltop { overflow-wrap: anywhere; }
+.confirm-parts .confirm-part-h { margin-top: 4px; }
+#confirm-title.bad { color: var(--bad); }
+.list-deleted { border-top: 1px solid var(--line2); padding-top: 6px; }
+.list-deleted > .cap { padding: 4px 12px; display: block; }
+#confirm .modal.sc-confirm { width: 640px; }
+#confirm .modal.sc-confirm.danger { width: 660px; }
+#confirm .modal.sc-confirm > .pad { gap: 8px; padding: 16px 18px; }
+#confirm .modal.sc-confirm .confirm-f { margin-top: 4px; }
+#confirm .modal.sc-confirm .btn:disabled { opacity: .55; }
+.sc-reg-it { align-self: flex-start; margin-top: 4px; }
+.sc-cmd { margin: 0; }
+.sc-where { width: 480px; flex: none; }
+.sc-where .card { margin-top: 2px; }
+a.well.sc-still { padding: 8px 12px; text-decoration: none; }
+.list .list-none.sc-off-none { padding: 16px 14px; }
+/* Sc-11: the share of a topic's messages each id has. */
+.sc-pull2 { margin-top: -2px; }
+.lane > div.kid { background: var(--mut); }
+.sc-idin { width: 90px; }
+/* Sc-16: the subject closest to a name that is not there. */
+.list .li.near { background: var(--okbg); }
+.sc-denied-side { width: 480px; flex: none; }
+.sc-snip { margin: 4px 0 0; }

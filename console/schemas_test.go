@@ -50,12 +50,13 @@ func register(t *testing.T, c *Console, subject, schema string) {
 
 func TestSchemasSectionIsOnlyThereWithARegistry(t *testing.T) {
 	without := newTestConsole(t)
+	// SCH-32 (Sc-14): the rail keeps Schemas, marked off, and its page says why.
 	rec := req(t, without, "GET", "/_console/topics", nil)
-	if strings.Contains(rec.Body.String(), "/_console/schemas") {
-		t.Error("the rail links Schemas although no registry is connected")
+	if rail := between(rec.Body.String(), `<nav class="rail"`, "</nav>"); !strings.Contains(rail, `href="/_console/schemas"`) || !strings.Contains(readable(rail), "Schemasoff") {
+		t.Errorf("the rail without a registry: %s", readable(rail))
 	}
 	rec = req(t, without, "GET", "/_console/schemas", nil)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "No schema registry is connected") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "switched off") || !strings.Contains(rec.Body.String(), "No registry to list") {
 		t.Errorf("Schemas without a registry = %d, want a page that says so", rec.Code)
 	}
 	if rec = req(t, without, "POST", "/_console/new/schema", url.Values{"subject": {"s"}, "schema": {userV1}}); rec.Code != http.StatusNotFound {
@@ -74,7 +75,7 @@ func TestSchemasSectionIsOnlyThereWithARegistry(t *testing.T) {
 // the subject.
 func TestSchemaSubjectLifecycle(t *testing.T) {
 	c, _, _ := newRegistryConsole(t)
-	if rec := req(t, c, "GET", "/_console/schemas", nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "No schemas yet") {
+	if rec := req(t, c, "GET", "/_console/schemas", nil); rec.Code != 200 || !strings.Contains(rec.Body.String(), "No subjects") {
 		t.Fatalf("empty Schemas page: %d", rec.Code)
 	}
 	register(t, c, "orders-value", userV1)
@@ -89,19 +90,19 @@ func TestSchemaSubjectLifecycle(t *testing.T) {
 	}
 
 	// A second version through the form; the page compares it with the first.
-	rec = req(t, c, "POST", "/_console/schemas/orders-value/register", url.Values{"schema": {userV2}, "type": {"AVRO"}})
+	rec = req(t, c, "POST", "/_console/new/schema", url.Values{"subject": {"orders-value"}, "schema": {userV2}, "type": {"AVRO"}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("register v2: %d %s", rec.Code, rec.Body)
 	}
 	rec = req(t, c, "GET", "/_console/schemas/orders-value", nil)
 	body = rec.Body.String()
-	for _, want := range []string{"Changes from v1", `class="dl add"`, "email", "v2", "latest"} {
+	for _, want := range []string{"Diff v1 to v2", "added optional", "email", "v2 latest"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("v2 page is missing %q", want)
 		}
 	}
 	rec = req(t, c, "GET", "/_console/schemas/orders-value?version=1", nil)
-	if strings.Contains(rec.Body.String(), "email") {
+	if strings.Contains(between(rec.Body.String(), `class="code sc-text`, "</pre>"), "email") {
 		t.Error("version 1 page shows version 2's field")
 	}
 
@@ -128,9 +129,9 @@ func TestSchemaSubjectLifecycle(t *testing.T) {
 		t.Errorf("delete a version: %d → %s", rec.Code, rec.Header().Get("Location"))
 	}
 	// Delete the subject: it is gone, with a page that says so.
-	req(t, c, "POST", "/_console/schemas/orders-value/delete", url.Values{})
+	req(t, c, "POST", "/_console/schemas/orders-value/delete", url.Values{"confirm": {"orders-value"}})
 	rec = req(t, c, "GET", "/_console/schemas/orders-value", nil)
-	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "no subject named") {
+	if rec.Code != http.StatusNotFound || !strings.Contains(readable(rec.Body.String()), "No subject called orders-value") {
 		t.Errorf("a deleted subject = %d, want a 404 page that names it", rec.Code)
 	}
 }
@@ -141,13 +142,13 @@ func TestSchemaCheckSaysWhyNot(t *testing.T) {
 	c, _, _ := newRegistryConsole(t)
 	register(t, c, "s", userV1)
 	check := func(schema string) string {
-		rec := req(t, c, "POST", "/_console/schemas/s/check", url.Values{"schema": {schema}, "type": {"AVRO"}})
+		rec := req(t, c, "POST", "/_console/new/schema/check", url.Values{"subject": {"s"}, "schema": {schema}, "type": {"AVRO"}})
 		if rec.Code != 200 {
 			t.Fatalf("check: %d %s", rec.Code, rec.Body)
 		}
 		return rec.Body.String()
 	}
-	if got := check(userV2); !strings.Contains(got, "Compatible.") {
+	if got := readable(check(userV2)); !strings.Contains(got, "Compatible") || strings.Contains(got, "Not compatible") {
 		t.Errorf("a compatible schema: %s", got)
 	}
 	bad := check(`{"type":"record","name":"User","fields":[{"name":"id","type":"long"},{"name":"email","type":"string"}]}`)
@@ -160,7 +161,7 @@ func TestSchemaCheckSaysWhyNot(t *testing.T) {
 		t.Errorf("a broken schema: %s", got)
 	}
 	// Registering the incompatible one is refused with the registry's reason.
-	rec := req(t, c, "POST", "/_console/schemas/s/register", url.Values{"schema": {`{"type":"record","name":"User","fields":[{"name":"id","type":"long"},{"name":"email","type":"string"}]}`}})
+	rec := req(t, c, "POST", "/_console/new/schema", url.Values{"subject": {"s"}, "schema": {`{"type":"record","name":"User","fields":[{"name":"id","type":"long"},{"name":"email","type":"string"}]}`}})
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "incompatible") {
 		t.Errorf("registering an incompatible schema = %d %s", rec.Code, rec.Body)
 	}

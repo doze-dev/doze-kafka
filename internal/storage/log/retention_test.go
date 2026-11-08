@@ -210,6 +210,9 @@ func TestRetentionTrimsPartitionsThatAreNotOpen(t *testing.T) {
 	}
 
 	opts.Retention = RetentionPolicy{MaxBytes: 1024}
+	// The loop's own sweep of unopened partitions at start would race the check
+	// below that the open-set sweep alone leaves "cold" alone (it failed on CI).
+	opts.noStartSweep = true
 	m2, err := OpenManager(dir, opts) // restarted: "cold" is not open.
 	if err != nil {
 		t.Fatal(err)

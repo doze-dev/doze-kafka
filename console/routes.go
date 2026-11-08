@@ -139,11 +139,16 @@ func (c *Console) routeTable() []routeRow {
 		// Schemas: the built-in registry.
 		get("/schemas", specSchemas, "the list", c.schemas),
 		get("/new/schema", specSchemas, "the register form", c.schemaCreatePage),
-		post("/new/schema", specSchemas, "register a first version", c.schemaCreate),
+		post("/new/schema", specSchemas, "register a version: a new subject's first, or the next", c.schemaCreate),
+		withoutMutating(post("/new/schema/check", specSchemas, "whether the draft parses and may follow the subject's versions: asks the registry, and sends nothing it stores", c.schemaRegisterCheck)),
+		withoutMutating(post("/new/schema/fix", specSchemas, "the draft with a finding's fix applied; sends nothing", c.schemaRegisterFix)),
 		get("/schemas/{subject}", specSchemas, "one subject", c.schemaDetail),
-		post("/schemas/{subject}/check", specSchemas, "try a version against the level", c.schemaCheck),
-		post("/schemas/{subject}/register", specSchemas, "register a new version", c.schemaRegister),
-		post("/schemas/{subject}/config", specSchemas, "set the compatibility level", c.schemaConfig),
+		get("/schemas/{subject}/diff", specSchemas, "two versions compared", c.schemaDiff),
+		get("/schemas/{subject}/open-id", specSchemas, "the newest message on the subject's topics that carries an id", c.schemaOpenID),
+		withoutMutating(post("/schemas/{subject}/try", specSchemas, "encode or check a JSON value with a version; sends nothing to the registry", c.schemaTry)),
+		post("/schemas/{subject}/config", specSchemas, "set the compatibility level and the mode, of the subject or the registry", c.schemaConfig),
+		post("/schemas/{subject}/mode", specSchemas, "set the subject's mode", c.schemaMode),
+		withoutMutating(post("/schemas/{subject}/level-check", specSchemas, "the latest version checked at a level, which is not saved: sends nothing that changes anything", c.schemaLevelCheck)),
 		post("/schemas/{subject}/delete", specSchemas, "delete the subject", c.schemaDelete),
 
 		// Consumer groups.

@@ -149,7 +149,9 @@ test('Tp-11: with a schema subject the value is written as JSON, checked as it i
   await page.goto('new/schema');
   await page.locator('#f-subject').fill(`${name}-value`);
   await page.locator('#f-schema').fill('{"type":"record","name":"Order","fields":[{"name":"orderId","type":"string"},{"name":"lines","type":"int"}]}');
-  await page.getByRole('button', { name: 'Register', exact: true }).click();
+  await page.locator('#reg-acts').getByRole('button', { name: 'Check compatibility' }).click();
+  await expect(page.locator('#reg-answer')).toContainText('Parses');
+  await page.locator('#reg-acts [data-register]').click();
   await expect(page.locator('.idband h1')).toHaveText(`${name}-value`);
   await topic(request, name);
   await page.goto(`topics/${name}`);

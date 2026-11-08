@@ -129,8 +129,25 @@ Deliberately, and each is pinned by a test:
 | `GET /schemas/ids/{unknown}/schema` | 500 | 404, error code 40403 |
 | JSON Schema `exclusiveMaximum` lowered | answers 500 (its checker has no name for the change) | answers the comparison |
 | Protobuf a parser would reject | its parser is lenient: an `extend` of a type that was never imported, a method named like a message | rejected as invalid (422) |
-| Verbose compatibility reasons | its checker's wording | the same shape; the three trailing lines (`oldSchemaVersion`, `oldSchema`, `validateFields`/`compatibility`) are identical, the reasons are worded by this implementation |
+| Compatibility reasons (the 409 `details` and the verbose `messages`) | its checkers' types, paths and wording | the same, word for word, for every refusal in the recorded corpus (2,287 of 2,291: `TestCorpusReasons`); the four that differ give the same verdict and are listed with why (a JSON Schema with both a type and an enum, a Protobuf field moved into a oneof that also lost a member) |
 | Avro with `normalize=true` | Avro's normalizer | key order and namespaces as Avro writes them, custom attributes sorted |
+| Limits | a schema body is read up to its JSON parser's 20,000,000-character string (400 past it); a level or a mode body is read whole, 20 MiB included; a path past about 8 KiB is 414 | a schema body is at most 20 MiB and a level or a mode body 64 KiB, past which the answer is 413 with error code 413; the JSON of an Avro or JSON Schema schema nests at most 256 levels (422, 42201: comparing deeper schemas costs the square of their depth); a subject is at most 16 KiB (422, 42208); one schema's references name at most 1,000 distinct schemas, each followed once however often it is named |
+| Metadata endpoints (`/v1/metadata/id`, `/v1/metadata/version`), `GET /contexts` | served | 404 |
+| Its own 500s: `format=serialized` on an id, a lookup in a soft-deleted subject | 500 | the parameter is ignored; the subject's 404 |
+
+## Extension routes (not Confluent paths)
+
+The console needs a few things Confluent's API does not carry. They are served under
+`/_doze/`, ask for the same credentials as every route, and no Confluent client calls
+them:
+
+| Route | Answers |
+|---|---|
+| `GET /_doze/overview` | every subject (soft-deleted ones included) with its type, live and deleted version counts, latest version and id, level and mode and whether each is its own, when they were set, when it last took a version; the global level and mode; the ids that resolve (`idsInUse`) and the ids a version that is not deleted holds (`liveIds`), as ranges; the next free id |
+| `GET /_doze/subjects/{subject}/versions/{version}` | a version as `GET /subjects/{subject}/versions/{version}` gives it, deleted ones included, with when it was registered and the basic-authentication user, address and `User-Agent` of the request that registered it (none of these for a version registered before they were kept; none of them names a Kafka client) |
+| `GET /_doze/subjects/{subject}/versions/{version}/resolved` | every schema the version reaches through its references, with its text; for Avro, the schema with each referenced type written out where it is first used (docs, defaults and properties kept; the same schema, as Avro reads it) |
+| `POST /_doze/subjects/{subject}/check?level=&version=` | the compatibility check, at a level other than the subject's if asked (the subject's is not changed), with the versions compared and each reason taken apart: type, path, sentence, additional information |
+| `GET /_doze/requests?subject=&before=&limit=` | the newest of the last 2,000 requests the registry answered (method, path, status, duration, user, address, `User-Agent`, the subject or id the path names; never a body), newest first, by subject (a request by id counts for each subject holding it), with a cursor; the path keeps its query; the extension routes and requests marked `X-Doze-Own` (the console sends it on its reads) are not kept |
 
 ## Avro payloads and the decoder
 

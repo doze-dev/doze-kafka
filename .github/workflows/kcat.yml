@@ -25,7 +25,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config zlib1g-dev libzstd-dev liblz4-dev \
-            libssl-dev libsasl2-dev libcurl4-openssl-dev libyajl-dev
+            libssl-dev libsasl2-dev libcurl4-openssl-dev libyajl-dev libavro-dev libjansson-dev
           scripts/install-kcat.sh /usr/local
       - name: Build
         run: go build -o doze-kafka ./cmd/doze-kafka

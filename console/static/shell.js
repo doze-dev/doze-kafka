@@ -476,6 +476,21 @@
       el.appendChild(n);
     });
   }
+  // A callout under a confirm's sentence (Gr-15, Sc-12): a head when it has one, then
+  // its text; a deny or warn tint.
+  function noteBox(n) {
+    var box = document.createElement("div"), body = document.createElement("span");
+    box.className = "callout" + (n.deny ? " deny" : "") + (n.warn ? " warn" : ""); box.setAttribute("role", "note");
+    if (n.head) {
+      var head = document.createElement("div"), b = document.createElement("span");
+      head.className = "row ce g8"; b.className = "b"; b.textContent = n.head; head.appendChild(b);
+      if (n.name) { var nm = document.createElement("span"); nm.className = "m"; nm.textContent = n.name; head.appendChild(nm); }
+      box.appendChild(head);
+    }
+    body.className = "note"; segs(body, n.body);
+    box.appendChild(body);
+    return box;
+  }
   document.addEventListener("htmx:confirm", function (e) {
     var box = document.getElementById("confirm");
     var q = e.detail.question;
@@ -520,18 +535,52 @@
     if (notes) {
       notes.textContent = "";
       (say.notes || []).forEach(function (n) {
-        var box = document.createElement("div"), head = document.createElement("div"), b = document.createElement("span"), body = document.createElement("span");
-        box.className = "callout" + (n.deny ? " deny" : ""); box.setAttribute("role", "note");
-        head.className = "row ce g8"; b.className = "b"; b.textContent = n.head; head.appendChild(b);
-        if (n.name) { var nm = document.createElement("span"); nm.className = "m"; nm.textContent = n.name; head.appendChild(nm); }
-        body.className = "note"; segs(body, n.body);
-        box.appendChild(head); box.appendChild(body); notes.appendChild(box);
+        notes.appendChild(noteBox(n));
       });
       notes.hidden = !(say.notes && say.notes.length);
     }
     if (call) { call.textContent = say.call || ""; call.hidden = !say.call; }
+    // Sc-12's: the request under the title, a red title, notes before the parts, the
+    // parts (bold heads), and a name to type before the verb is on.
+    var title = document.getElementById("confirm-title");
+    title.classList.toggle("bad", !!say.danger);
+    // Sc-12's dialogs are the boards' wider ones, their parts 8 px apart.
+    var modal = box.querySelector(".modal");
+    if (modal) { modal.classList.toggle("sc-confirm", !!(say.parts && say.parts.length)); modal.classList.toggle("danger", !!say.danger); }
+    var top = document.getElementById("confirm-calltop");
+    if (top) { top.textContent = say.callTop || ""; top.hidden = !say.callTop; }
+    var lead = document.getElementById("confirm-lead");
+    if (lead) {
+      lead.textContent = "";
+      (say.lead || []).forEach(function (n) { lead.appendChild(noteBox(n)); });
+      lead.hidden = !(say.lead && say.lead.length);
+    }
+    var parts = document.getElementById("confirm-parts");
+    if (parts) {
+      parts.textContent = "";
+      (say.parts || []).forEach(function (p, i) {
+        var h = document.createElement("span"), t = document.createElement("span");
+        h.className = "b" + (i ? " confirm-part-h" : ""); h.textContent = p.head; segs(t, p.body);
+        parts.appendChild(h); parts.appendChild(t);
+      });
+      parts.hidden = !(say.parts && say.parts.length);
+    }
+    msg.hidden = !say.body && !!(say.parts && say.parts.length);
+    var typedBox = document.getElementById("confirm-typed"), typed = document.getElementById("confirm-type");
     var yes = document.getElementById("confirm-yes"), no = document.getElementById("confirm-no");
     yes.textContent = say.verb || "Confirm";
+    yes.disabled = false;
+    if (typedBox && typed) {
+      typedBox.hidden = !say.typed;
+      typed.value = "";
+      typed.placeholder = say.typed || "";
+      document.getElementById("confirm-type-l").textContent = say.typedLabel || "Type the name to confirm";
+      typed.oninput = null;
+      if (say.typed) {
+        yes.disabled = true;
+        typed.oninput = function () { yes.disabled = typed.value !== say.typed; };
+      }
+    }
     box.hidden = false;
     // The keys strip says what the keys do in the dialog while it is open (Tp-24).
     root.setAttribute("data-dialog", "confirm");
@@ -545,11 +594,21 @@
       if (ev.key === "Escape") { close(true); ev.preventDefault(); ev.stopPropagation(); return; }
       trapTab(box, ev);
     }
-    yes.onclick = function () { close(false); e.detail.issueRequest(true); };
+    yes.onclick = function () {
+      if (yes.disabled) return;
+      // A confirm that asked for a name sends it (the server checks it too).
+      if (say.typed && elt.setAttribute) {
+        var vals = {};
+        try { vals = JSON.parse(elt.getAttribute("hx-vals") || "{}"); } catch (err) {}
+        vals.confirm = typed.value;
+        elt.setAttribute("hx-vals", JSON.stringify(vals));
+      }
+      close(false); e.detail.issueRequest(true);
+    };
     no.onclick = function () { close(true); };
     box.onclick = function (ev) { if (ev.target === box) close(true); };
     document.addEventListener("keydown", onKey, true);
-    no.focus();
+    if (say.typed && typed) typed.focus(); else no.focus();
     }
   });
 
@@ -852,6 +911,9 @@
     cursorEl = rows[next];
     cursorEl.classList.add("cursor");
     cursorEl.scrollIntoView({ block: "nearest" });
+    // On the Compatibility tab (Sc-09) j and k choose the level the cursor is on.
+    var lv = cursorEl.matches(".sc-levels label.r") && cursorEl.querySelector('input[type="radio"]');
+    if (lv && !lv.checked) lv.click();
   }
   function focusComposer() {
     var panel = document.getElementById("compose-panel");
@@ -892,6 +954,11 @@
     // ⌘⏎ sends from the composer, from a plain field or from inside the editor.
     // Once per press: a held key repeats, and each repeat used to send a record.
     if (mod && e.key === "Enter") {
+      // ⇧⌘⏎ registers, on the register page (Sc-02): its Register button.
+      if (e.shiftKey) {
+        var reg = document.querySelector("main [data-register]:not([disabled])");
+        if (reg) { e.preventDefault(); if (!e.repeat) reg.click(); return; }
+      }
       // A create form (data-mod-enter, Ac-03) is sent from anywhere on its page.
       var form = (active.closest ? active.closest("form") : null) || document.querySelector("main form[data-mod-enter]");
       if (form && (form.hasAttribute("data-mod-enter") || form.querySelector("textarea, .cm-editor"))) {
@@ -973,15 +1040,27 @@
         // The click puts focus on the inspector's Close button; left alone, this
         // same Enter then activates that button and shuts what it just opened.
         e.preventDefault();
-        cursorEl.click();
+        // A row that is not a link itself opens what its own link does (Sc-11's
+        // "newest on this id", Sc-17's "message, raw").
+        var opens = cursorEl.matches("a[href], button, [hx-get], [data-inspector-open]") ? cursorEl : (cursorEl.querySelector("a[href]") || cursorEl);
+        opens.click();
         return;
       }
       // A page that is one question (Ac-05's checker, data-enter) asks it.
       var ask = document.querySelector("main form[data-enter]");
       if (ask) { e.preventDefault(); ask.requestSubmit(); return; }
+      // The registry refused the console (Sc-13): ↵ tries again.
+      var again = document.querySelector("main [data-retry-page]");
+      if (again) { e.preventDefault(); again.click(); return; }
+      // A subject not found (Sc-16): ↵ opens the closest one.
+      var closest = document.querySelector("main [data-closest]");
+      if (closest) { e.preventDefault(); closest.click(); return; }
       return false;
     },
     create: function () {
+      // Sc-14: c copies the command that turns the registry on.
+      var cc = document.querySelector("main [data-copy-command]");
+      if (cc) { cc.click(); return; }
       var nb = document.querySelector("[data-create]");
       if (nb) nb.click(); else return false;
     },
@@ -1030,6 +1109,18 @@
     "tab-n": function (e) { return groupsTabN(e.key); },
     // r: a group's Reset offsets, the button of its title row.
     "reset-offsets": function () { return groupsResetOffsets(); },
+    // On a subject: d diffs the version on show with the one before; n registers a new version.
+    // On a diff (Sc-06): [ and ] step to the older and newer pair; u flips the layout.
+    "pair-older": function () { var a = document.querySelector("main [data-pair-older]"); if (!a) return false; a.click(); },
+    "pair-newer": function () { var a = document.querySelector("main [data-pair-newer]"); if (!a) return false; a.click(); },
+    unified: function () {
+      var seg = document.querySelector('main .seg[aria-label="Diff layout"]');
+      if (!seg) return false;
+      var off = seg.querySelector("a:not(.on)");
+      if (off) off.click();
+    },
+    diff: function () { var b = document.querySelector("main [data-diff]"); if (!b) return false; b.click(); },
+    "new-version": function () { var b = document.querySelector("main [data-new-version]"); if (!b) return false; b.click(); },
     // Esc closes the panel; with none open it clears the page's own filter.
     close: function (e) {
       if (inspectorIsOpen()) { closeInspector(); e.preventDefault(); return; }
@@ -1277,6 +1368,9 @@
   }
   document.addEventListener("DOMContentLoaded", syncInspectorFromURL);
   window.addEventListener("popstate", syncInspectorFromURL);
+  // A boosted link that names a selection (a subject's version row, ?open=version:…)
+  // opens it once its page is in.
+  document.addEventListener("htmx:afterSettle", function (e) { if (e.detail && e.detail.boosted && openParamNow() != null) syncInspectorFromURL(); });
   // "Send again" closes the inspector once the broker has taken the copy; on a
   // failure it stays open, and the error is a toast.
   document.addEventListener("htmx:afterRequest", function (e) {
@@ -1468,8 +1562,19 @@
       case "datetime": return date + " " + clock;
       case "datetimems": return date + " " + clock + "." + pad(d.getMilliseconds(), 3);
       case "date": return date;
+      case "day": return dayText(d, new Date());
     }
     return clock;
+  }
+  // A moment by the day it fell on (timefmt.go's dayText): 14:02 today, yesterday
+  // 16:48, 3 days ago, then the date.
+  function dayText(d, now) {
+    var a = new Date(d.getFullYear(), d.getMonth(), d.getDate()), b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var days = Math.round((b - a) / 86400000), hm = pad(d.getHours()) + ":" + pad(d.getMinutes());
+    if (days <= 0) return hm + " today";
+    if (days === 1) return "yesterday " + hm;
+    if (days < 7) return days + " days ago";
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   }
   function spanText(ms) {
     var s = Math.max(0, Math.floor(ms / 1000));
@@ -1961,8 +2066,58 @@ document.addEventListener("click", function (e) {
 })();
 
 // Groups: 1 to 4 open the group's tabs by number; r follows its Reset offsets button.
+// The register page (Sc-02): the type segment is radio buttons drawn as the board's
+// segment, and a reference is a row added from a template and removed by its ×.
+document.addEventListener("change", function (e) {
+  var r = e.target;
+  if (!r || !r.matches) return;
+  if (r.matches('.sc-seg input[type="radio"]')) {
+    r.closest(".sc-seg").querySelectorAll("label").forEach(function (l) { l.classList.toggle("on", l.contains(r)); });
+  }
+  // Sc-09: the chosen level is the row drawn on, and the body Try it would send.
+  if (r.matches('.sc-levels input[name="level"]')) {
+    r.closest(".sc-levels").querySelectorAll("label.r").forEach(function (l) { l.classList.toggle("on", l.contains(r)); });
+    var body = document.getElementById("level-body");
+    if (body) body.textContent = JSON.stringify({ compatibility: r.value });
+  }
+});
+// The schema field's line numbers follow its lines.
+document.addEventListener("input", function (e) {
+  var ta = e.target;
+  if (!ta || ta.id !== "f-schema") return;
+  var g = ta.parentNode && ta.parentNode.querySelector("[data-gutter]");
+  if (!g) return;
+  var lines = ta.value.replace(/\n+$/, "").split("\n").length;
+  var n = Math.max(lines, 11), out = [];
+  for (var i = 1; i <= n; i++) out.push(i);
+  g.textContent = out.join("\n");
+  // "Avro · 11 lines · parses": what the field holds, said as Sc-02 says it. Avro and JSON
+  // Schema are JSON, so parsing is a JSON parse; Protobuf the registry parses on Check.
+  var stats = document.getElementById("reg-stats");
+  if (!stats) return;
+  var t = document.querySelector('.sc-seg input:checked, #reg-form input[type=hidden][name=type]');
+  var type = t ? t.value : "AVRO", label = type === "PROTOBUF" ? "Protobuf" : type === "JSON" ? "JSON Schema" : "Avro";
+  if (!ta.value.trim()) { stats.textContent = label + " · empty"; return; }
+  var say = label + " · " + lines + " line" + (lines === 1 ? "" : "s");
+  if (type !== "PROTOBUF") { try { JSON.parse(ta.value); say += " · parses"; } catch (err) { say += " · not JSON yet"; } }
+  stats.textContent = say;
+});
+document.addEventListener("click", function (e) {
+  var add = e.target.closest && e.target.closest("[data-add-ref]");
+  if (add) {
+    var tpl = document.getElementById("ref-row-new"), box = document.getElementById("reg-refs");
+    if (!tpl || !box) return;
+    var row = tpl.content.firstElementChild.cloneNode(true);
+    box.insertBefore(row, tpl);
+    var first = row.querySelector("input");
+    if (first) first.focus();
+    return;
+  }
+  var rm = e.target.closest && e.target.closest("[data-ref-remove]");
+  if (rm) { var row = rm.closest("[data-ref-row]"); if (row) row.remove(); }
+});
 function groupsTabN(key) {
-  var tabs = Array.prototype.filter.call(document.querySelectorAll("#group-live nav.tabs a.tab"), function (t) { return t.offsetParent !== null; });
+  var tabs = Array.prototype.filter.call(document.querySelectorAll("#group-live nav.tabs a.tab, main nav.tabs[aria-label='Subject tabs'] a.tab"), function (t) { return t.offsetParent !== null; });
   var to = tabs[parseInt(key, 10) - 1];
   if (!to) return false;
   to.click();

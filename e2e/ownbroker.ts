@@ -19,7 +19,11 @@ export class OwnBroker {
   private readonly instance: string;
   private proc?: ChildProcess;
 
-  constructor(name: string, offset: number) {
+  /** Flags added to the broker's own (a spec's: --schema-registry=false for Sc-14). */
+  private readonly extra: string[];
+
+  constructor(name: string, offset: number, extra: string[] = []) {
+    this.extra = extra;
     this.port = Number(process.env.E2E_PORT ?? 14092) + offset;
     this.console = `http://127.0.0.1:${this.port + 1}${PREFIX}/`;
     this.kafka = `127.0.0.1:${this.port}`;
@@ -40,7 +44,7 @@ export class OwnBroker {
   /** Starts it over the data directory it has. */
   async up(): Promise<void> {
     const p = this.port;
-    this.proc = spawn(this.bin, ['--listen', `127.0.0.1:${p}`, '--console-addr', `127.0.0.1:${p + 1}`, '--schema-registry-addr', `127.0.0.1:${p + 2}`, '--data-dir', this.data, '--name', this.instance],
+    this.proc = spawn(this.bin, ['--listen', `127.0.0.1:${p}`, '--console-addr', `127.0.0.1:${p + 1}`, '--schema-registry-addr', `127.0.0.1:${p + 2}`, '--data-dir', this.data, '--name', this.instance, ...this.extra],
       { cwd: this.root, env: { ...process.env, DOZE_ZONE: 'off', DOZE_KAFKA_CONSOLE_PREFIX: PREFIX }, stdio: 'ignore' });
     for (let i = 0; i < 150; i++) {
       try {

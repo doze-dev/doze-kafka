@@ -10,7 +10,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +24,19 @@ import (
 // API. It shares nothing with the registry's code but the payload codec, so it works
 // the same against a registry in another process (or another vendor's, as long as it
 // speaks Confluent's API).
+
+// registryUnreachable is a registry call that got no answer at all: the registry is
+// stopped, or not where the console was told. The broker may be fine, so it is not
+// the broker's "Can't reach" page.
+type registryUnreachable struct {
+	base string
+	err  error
+}
+
+func (e *registryUnreachable) Error() string {
+	return "the schema registry is not reachable: " + e.err.Error()
+}
+func (e *registryUnreachable) Unwrap() error { return e.err }
 
 // regError is an answer from the registry that was not success.
 type regError struct {
@@ -50,6 +65,11 @@ type registryClient struct {
 
 	mu     sync.Mutex
 	codecs map[int]*codecEntry
+	// While the registry cannot be reached, no id is asked of it until downUntil;
+	// each failed probe doubles the wait (from downFirst to downMost), any answer ends it.
+	downUntil time.Time
+	downFor   time.Duration
+	downErr   error
 }
 
 // codecEntry is what is known about one schema id for decoding payloads: its codec,
@@ -93,14 +113,23 @@ func (rc *registryClient) call(ctx context.Context, method, path string, body, o
 	if err != nil {
 		return err
 	}
+	// The console's own reads: doze-kafka's registry answers them and leaves them out of
+	// its request log, so the pages' polling does not push out what clients asked
+	// (schemaregistry/requests.go). What a person does here (register, check, delete, a
+	// level set) is a request like any client's and is kept: the dock shows it. Another
+	// registry ignores the header.
+	if method == http.MethodGet {
+		req.Header.Set("X-Doze-Own", "1")
+	}
 	req.Header.Set("Content-Type", "application/vnd.schemaregistry.v1+json")
+	req.Header.Set("User-Agent", consoleAgent)
 	req.Header.Set("Accept", "application/vnd.schemaregistry.v1+json, application/json")
 	if rc.user != "" {
 		req.SetBasicAuth(rc.user, rc.pass)
 	}
 	resp, err := rc.hc.Do(req)
 	if err != nil {
-		return fmt.Errorf("the schema registry is not reachable: %w", err)
+		return &registryUnreachable{base: rc.base, err: err}
 	}
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
@@ -145,8 +174,12 @@ func (v schemaVersion) Type() string {
 	return v.SchemaType
 }
 
-// Pretty is the schema as shown: JSON re-indented, Protobuf as it is.
+// Pretty is the schema as shown: an Avro record or a JSON Schema object as the
+// boards print them (printSchema), other JSON re-indented, Protobuf as it is.
 func (v schemaVersion) Pretty() string {
+	if out, ok := printSchema(v.Type(), v.Schema); ok {
+		return out
+	}
 	if v.Type() != schemaregistry.TypeProtobuf {
 		if p, ok := indentJSON([]byte(v.Schema)); ok {
 			return p
@@ -206,6 +239,26 @@ func (rc *registryClient) Subjects(ctx context.Context) ([]SubjectRow, error) {
 // Catalogue is every subject with its latest version and how many versions it has,
 // and the schema id of every version: one request (GET /schemas).
 func (rc *registryClient) Catalogue(ctx context.Context) ([]SubjectRow, []int, error) {
+	// doze-kafka's registry has the overview: every subject in one answer and no schema
+	// text (SCH-8). Another registry is read through GET /schemas, which sends every
+	// version's text.
+	if o, ok := rc.Overview(ctx); ok {
+		out := make([]SubjectRow, 0, len(o.Subjects))
+		for _, s := range o.Subjects {
+			if s.Deleted || s.Versions == 0 {
+				continue
+			}
+			out = append(out, SubjectRow{Name: s.Subject, Versions: s.Versions, Latest: s.LatestVersion, ID: s.LatestID, Type: s.Type, TypeLabel: typeLabel(s.Type)})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+		var ids []int
+		for _, r := range o.LiveIDs {
+			for id := r[0]; id <= r[1]; id++ {
+				ids = append(ids, id)
+			}
+		}
+		return out, ids, nil
+	}
 	var all []schemaVersion
 	if err := rc.call(ctx, "GET", "/schemas", nil, &all); err != nil {
 		return nil, nil, err
@@ -228,7 +281,8 @@ func (rc *registryClient) Catalogue(ctx context.Context) ([]SubjectRow, []int, e
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	sort.Ints(ids)
-	return out, ids, nil
+	// One schema registered under two subjects is one id.
+	return out, slices.Compact(ids), nil
 }
 
 // Mode is the registry's global mode (READWRITE, READONLY, IMPORT).
@@ -317,22 +371,6 @@ func (rc *registryClient) Register(ctx context.Context, subject string, b schema
 	return out.ID, err
 }
 
-func (rc *registryClient) DeleteVersion(ctx context.Context, subject string, version int) error {
-	p := "/subjects/" + segment(subject) + "/versions/" + fmt.Sprint(version)
-	if err := rc.call(ctx, "DELETE", p, nil, nil); err != nil {
-		return err
-	}
-	return rc.call(ctx, "DELETE", p+"?permanent=true", nil, nil)
-}
-
-func (rc *registryClient) DeleteSubject(ctx context.Context, subject string) error {
-	p := "/subjects/" + segment(subject)
-	if err := rc.call(ctx, "DELETE", p, nil, nil); err != nil {
-		return err
-	}
-	return rc.call(ctx, "DELETE", p+"?permanent=true", nil, nil)
-}
-
 // SubjectNames lists the subjects, for choosing one to encode with.
 func (rc *registryClient) SubjectNames(ctx context.Context) []string {
 	var names []string
@@ -345,31 +383,64 @@ func (rc *registryClient) SubjectNames(ctx context.Context) []string {
 
 // codecFor prepares the decoder for a schema id, with the subject and version that
 // hold it (the one named like the topic when there is a choice).
+//
+// An id the registry answered for is kept (its schema never changes); one it does not
+// hold, or could not read, is asked again after unknownFor. While the registry cannot be
+// reached at all, no id is asked: one probe, then a wait that doubles (SCH-24), so a
+// table of a thousand rows is not a thousand requests to a registry that is down.
 func (rc *registryClient) codecFor(ctx context.Context, id int, topic string) (*codecEntry, error) {
 	rc.mu.Lock()
-	if e, ok := rc.codecs[id]; ok && (e.err == nil || time.Since(e.at) < 5*time.Second) {
+	if e, ok := rc.codecs[id]; ok && (e.err == nil || time.Since(e.at) < unknownFor) {
 		rc.mu.Unlock()
 		return e, e.err
+	}
+	if time.Now().Before(rc.downUntil) {
+		err := rc.downErr
+		rc.mu.Unlock()
+		return &codecEntry{err: err, at: time.Now()}, err
 	}
 	rc.mu.Unlock()
 
 	e := &codecEntry{at: time.Now()}
 	e.codec, e.subject, e.version, e.err = rc.buildCodec(ctx, id, topic)
 	rc.mu.Lock()
-	if len(rc.codecs) > 512 {
-		rc.codecs = map[int]*codecEntry{}
+	defer rc.mu.Unlock()
+	var re *regError
+	if e.err != nil && !errors.As(e.err, &re) {
+		// Not an answer from the registry: it is down or unreachable. Wait before the
+		// next probe, and do not remember the id as unknown.
+		rc.downFor = min(max(2*rc.downFor, downFirst), downMost)
+		rc.downUntil, rc.downErr = time.Now().Add(rc.downFor), e.err
+		return e, e.err
+	}
+	rc.downFor, rc.downUntil, rc.downErr = 0, time.Time{}, nil
+	if len(rc.codecs) >= maxCodecs {
+		// Full: the entry asked longest ago goes.
+		oldest, at := 0, time.Time{}
+		for k, v := range rc.codecs {
+			if at.IsZero() || v.at.Before(at) {
+				oldest, at = k, v.at
+			}
+		}
+		delete(rc.codecs, oldest)
 	}
 	rc.codecs[id] = e
-	rc.mu.Unlock()
 	return e, e.err
 }
+
+const (
+	maxCodecs  = 512
+	unknownFor = 30 * time.Second
+	downFirst  = time.Second
+	downMost   = 30 * time.Second
+)
 
 func (rc *registryClient) buildCodec(ctx context.Context, id int, topic string) (*schemaregistry.Codec, string, int, error) {
 	var s schemaVersion
 	if err := rc.call(ctx, "GET", fmt.Sprintf("/schemas/ids/%d", id), nil, &s); err != nil {
 		return nil, "", 0, err
 	}
-	refs, err := rc.resolve(ctx, s, 0)
+	refs, err := rc.resolve(ctx, s)
 	if err != nil {
 		return nil, "", 0, err
 	}
@@ -394,26 +465,51 @@ func (rc *registryClient) buildCodec(ctx context.Context, id int, topic string) 
 	return codec, subject, version, nil
 }
 
-// resolve follows a schema's references to their text, dependencies first.
-func (rc *registryClient) resolve(ctx context.Context, s schemaVersion, depth int) ([]schemaregistry.Ref, error) {
-	if depth > 16 {
-		return nil, errors.New("schema references are nested too deeply")
-	}
+// resolve follows a schema's references to their text, dependencies first. Each
+// (subject, version) is fetched and followed once, so a schema that names one many
+// times (a diamond) costs what it names and not its paths, and the bound is the
+// registry's own: at most maxResolved distinct schemas.
+func (rc *registryClient) resolve(ctx context.Context, s schemaVersion) ([]schemaregistry.Ref, error) {
 	var out []schemaregistry.Ref
-	for _, r := range s.References {
-		dep, err := rc.Version(ctx, r.Subject, r.Version)
-		if err != nil {
-			return nil, err
+	followed := map[string]bool{}
+	seen := map[string]bool{}
+	fetched := map[string]schemaVersion{}
+	var walk func(s schemaVersion) error
+	walk = func(s schemaVersion) error {
+		for _, r := range s.References {
+			node := fmt.Sprintf("%s\x00%d", r.Subject, r.Version)
+			dep, ok := fetched[node]
+			if !ok {
+				var err error
+				if dep, err = rc.Version(ctx, r.Subject, r.Version); err != nil {
+					return err
+				}
+				fetched[node] = dep
+			}
+			if !followed[node] {
+				if len(followed) >= maxResolved {
+					return fmt.Errorf("schema references name more than %d schemas", maxResolved)
+				}
+				followed[node] = true
+				if err := walk(dep); err != nil {
+					return err
+				}
+			}
+			if key := node + "\x00" + r.Name; !seen[key] {
+				seen[key] = true
+				out = append(out, schemaregistry.Ref{Name: r.Name, Type: dep.Type(), Text: dep.Schema})
+			}
 		}
-		inner, err := rc.resolve(ctx, dep, depth+1)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, inner...)
-		out = append(out, schemaregistry.Ref{Name: r.Name, Type: dep.Type(), Text: dep.Schema})
+		return nil
+	}
+	if err := walk(s); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
+
+// maxResolved is the registry's bound on the schemas one graph of references names.
+const maxResolved = 1000
 
 // decoded is a record value read through the registry.
 type decoded struct {
@@ -478,7 +574,7 @@ func (rc *registryClient) encode(ctx context.Context, subject, doc string) ([]by
 	if err != nil {
 		return nil, err
 	}
-	refs, err := rc.resolve(ctx, v, 0)
+	refs, err := rc.resolve(ctx, v)
 	if err != nil {
 		return nil, err
 	}
@@ -539,4 +635,36 @@ func diffLines(a, b string) []diffLine {
 		out = append(out, diffLine{"add", y[j]})
 	}
 	return out
+}
+
+// regRequests is a page of the registry's request log (GET /_doze/requests), newest
+// first: doze-kafka's registry keeps it; another registry has no such route.
+type regRequests struct {
+	Requests []struct {
+		Seq    uint64    `json:"seq"`
+		At     time.Time `json:"at"`
+		Method string    `json:"method"`
+		Path   string    `json:"path"`
+		Status int       `json:"status"`
+		Took   int64     `json:"tookNanos"`
+		User   string    `json:"user"`
+		From   string    `json:"from"`
+		Agent  string    `json:"agent"`
+	} `json:"requests"`
+	Next uint64 `json:"next"`
+}
+
+// Requests reads the registry's request log: all of it, or the requests about one
+// subject; before is the cursor (0 for the newest).
+func (rc *registryClient) Requests(ctx context.Context, subject string, before uint64, limit int) (regRequests, error) {
+	q := url.Values{"limit": {strconv.Itoa(limit)}}
+	if subject != "" {
+		q.Set("subject", subject)
+	}
+	if before != 0 {
+		q.Set("before", strconv.FormatUint(before, 10))
+	}
+	var out regRequests
+	err := rc.call(ctx, http.MethodGet, "/_doze/requests?"+q.Encode(), nil, &out)
+	return out, err
 }

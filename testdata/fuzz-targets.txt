@@ -58,6 +58,7 @@
 ./schemaregistry FuzzVersionPath
 # The console's form inputs, through its handler, against a real broker.
 ./server FuzzConsoleForms
+./console FuzzSchemaForms
 # The console's own reader: trace headers in a record.
 ./console FuzzTraceHeaders
 # The Host header, as the console and the schema registry both judge it.

@@ -11,15 +11,16 @@
 # by commit, so what is built cannot change under the same file.
 #
 # Needs: a C toolchain, pkg-config, and the headers of zlib, zstd, lz4, OpenSSL,
-# SASL, curl and yajl. On Debian or Ubuntu:
+# SASL, curl, yajl, and for Avro (libserdes) avro-c and jansson. On Debian or Ubuntu:
 #   apt-get install -y build-essential pkg-config zlib1g-dev libzstd-dev liblz4-dev \
-#     libssl-dev libsasl2-dev libcurl4-openssl-dev libyajl-dev curl ca-certificates
+#     libssl-dev libsasl2-dev libcurl4-openssl-dev libyajl-dev libavro-dev libjansson-dev \
+#     curl ca-certificates
 set -euo pipefail
 
 # The pins are compat/versions.env's (docs/clients.md's table is held to the same file).
 # shellcheck source=../compat/versions.env
 . "$(cd "$(dirname "$0")/.." && pwd)/compat/versions.env"
-: "${KCAT_VERSION:?}" "${KCAT_COMMIT:?}" "${LIBRDKAFKA_VERSION:?}" "${LIBRDKAFKA_COMMIT:?}"
+: "${KCAT_VERSION:?}" "${KCAT_COMMIT:?}" "${LIBRDKAFKA_VERSION:?}" "${LIBRDKAFKA_COMMIT:?}" "${LIBSERDES_VERSION:?}" "${LIBSERDES_COMMIT:?}"
 
 prefix=${1:-/usr/local}
 sudo=""
@@ -44,6 +45,17 @@ name=librdkafka
   make -j"$jobs" libs >"$logs/$name-make" 2>&1 || { tail -60 "$logs/$name-make"; exit 1; }
   $sudo make -C src install >"$logs/$name-install" 2>&1 || { tail -40 "$logs/$name-install"; exit 1; } )
 
+echo "== libserdes v$LIBSERDES_VERSION ($LIBSERDES_COMMIT)"
+fetch confluentinc/libserdes "$LIBSERDES_COMMIT" "$work/libserdes"
+name=libserdes
+# glibc 2.34+ declares C11's once_flag and call_once in <stdlib.h> (under _GNU_SOURCE,
+# which libserdes's bundled tinycthread sets), and GCC 15 refuses tinycthread's own
+# definitions beside them: compat/kcat/libserdes-glibc-once.patch uses libc's.
+patch -d "$work/libserdes" -p1 <"$(dirname "$0")/../compat/kcat/libserdes-glibc-once.patch" >"$logs/$name-patch" 2>&1 || { cat "$logs/$name-patch"; exit 1; }
+( cd "$work/libserdes" && ./configure --prefix="$prefix" >"$logs/$name-configure" 2>&1 || { tail -40 "$logs/$name-configure"; exit 1; }
+  make -j"$jobs" >"$logs/$name-make" 2>&1 || { tail -60 "$logs/$name-make"; exit 1; }
+  $sudo make install >"$logs/$name-install" 2>&1 || { tail -40 "$logs/$name-install"; exit 1; } )
+
 echo "== kcat $KCAT_VERSION ($KCAT_COMMIT)"
 fetch edenhill/kcat "$KCAT_COMMIT" "$work/kcat"
 name=kcat
@@ -61,3 +73,5 @@ echo "$out" | sed -n 's/^Version/kcat version/p'
 ver=$(echo "$out" | sed -n 's/.*librdkafka \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' | head -1)
 [ "$ver" = "$LIBRDKAFKA_VERSION" ] || { echo "kcat links librdkafka '$ver', wanted $LIBRDKAFKA_VERSION" >&2; exit 1; }
 echo "ok       $prefix/bin/kcat links librdkafka $ver"
+echo "$out" | grep -q 'Avro' || { echo "kcat was built without Avro (libserdes not found by its configure)" >&2; exit 1; }
+echo "ok       $prefix/bin/kcat decodes Avro through a registry (libserdes $LIBSERDES_VERSION)"

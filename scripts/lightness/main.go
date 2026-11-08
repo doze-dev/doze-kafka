@@ -15,11 +15,14 @@
 //     how: no cgo, -trimpath, no VCS stamp, the toolchain go.mod names), so one
 //     byte over the budget fails;
 //   - idleHeapBytes: the live heap after three forced collections (see
-//     idleHeap for why three), the largest of several starts. It varies from
-//     start to start by a few KB (7.7 KB across 20 starts on macOS/arm64); so
-//     the budget is the largest of 20 starts, the check takes the largest of
-//     5, and the gate allows what the largest sat above the median when
-//     recorded (idleHeapNoiseBytes) and no more;
+//     idleHeap for why three), the median of several starts. It varies from
+//     start to start by a few KB (7.7 KB across 20 starts on macOS/arm64), and
+//     now and then one start reads far above the rest with nothing grown (CI's
+//     linux/arm64 runner, 2026-11). So the budget is the median of 20 starts,
+//     the check takes the median of 5, and the gate allows what the largest
+//     start sat above the median when recorded (idleHeapNoiseBytes) and no
+//     more. Budgets recorded before 2026-11-08 are the largest of 20 starts,
+//     and come down to the median the next time they are recorded;
 //   - modules: `go list -m all`, exact.
 //
 // A platform with no budget fails: a budget recorded on macOS says nothing
@@ -220,11 +223,11 @@ type Measured struct {
 
 func (m *Measured) median() int64 { return m.Heaps[len(m.Heaps)/2] }
 
-// heap is the idle heap as the gate reads it: the largest of the starts.
-func (m *Measured) heap() int64 { return m.Heaps[len(m.Heaps)-1] }
+// heap is the idle heap as the gate reads it: the median of the starts.
+func (m *Measured) heap() int64 { return m.median() }
 
 // noise is how far the largest start sat above the median one.
-func (m *Measured) noise() int64 { return m.heap() - m.median() }
+func (m *Measured) noise() int64 { return m.Heaps[len(m.Heaps)-1] - m.median() }
 
 // Compare holds what was measured against a platform's budget.
 func Compare(b *Budget, m *Measured) (failures, notes []string) {
@@ -511,8 +514,8 @@ func run(root, mode, reason, where string, runs int, stdout, stderr io.Writer) i
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "%s, %s: binary %d bytes, idle heap %d bytes (the largest of %d starts; smallest %d, median %d), %d modules\n",
-		m.Platform, m.Go, m.BinaryBytes, m.heap(), len(m.Heaps), m.Heaps[0], m.median(), m.Modules)
+	fmt.Fprintf(stdout, "%s, %s: binary %d bytes, idle heap %d bytes (the median of %d starts; smallest %d, largest %d), %d modules\n",
+		m.Platform, m.Go, m.BinaryBytes, m.heap(), len(m.Heaps), m.Heaps[0], m.Heaps[len(m.Heaps)-1], m.Modules)
 	switch mode {
 	case "measure":
 		return 0

@@ -243,7 +243,7 @@ func (c *Console) topicDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	partition := partitionParam(r, detail.Partitions)
-	schemas := c.topicSchemas(r, name)
+	schemas := c.topicSchemas(r, name, detail.Partitions)
 
 	tab := r.URL.Query().Get("tab")
 	valid := false

@@ -28,7 +28,7 @@ const AD1_FILTER = 'AD1: a filter field at the top of the list pane, which the b
 const LIST_UNDERLINE = 'the boards disagree: Tp-Home and Tp-05 set their list items\' text-decoration to none, Gr-Home, Sc-Home and Ac-Home leave them to con.css\'s link underline; the console draws every list pane the one way';
 const SY06_C = 'Sy-06 binds c to Create on Topics and Subjects; Sc-Home\'s strip names n, which no board binds';
 const HOME_MORE = 'CUT: the board draws a ··· on the home with nothing it holds; the design puts Delete under ··· (Grounding) and a home has nothing to delete; without it the title column is the ···\'s width wider';
-const REGISTRY_DOCK = 'CUT: the registry\'s wire (the board\'s dock under Schemas): the registry\'s requests are not recorded by the traffic recorder, so there is no source for it';
+const REGISTRY_DOCK = 'the board draws the registry\'s wire dock inside main (a margin of -20px to the edges), so its live pill is a pill in main; the console\'s dock is the row under main in the panes grid (schemas/allow.ts and groups/allow.ts have the same entry), so main is the dock\'s height shorter and has no pill';
 const TC_ROWS = 'the board\'s rows carry no tracks (only its header row sets --c), so its own render stacks each row\'s cells in one 930 px column; the console gives the rows the header\'s tracks';
 const TC_SHRINK = 'the board\'s page is taller than its 900 px frame, and its column of cards shrinks them to fit (the trace form renders 96 px for 108 px of content); the console\'s page scrolls instead, so what follows the form is lower';
 const ACL_DOCK_ROW = 'the wire is the page\'s own row under main, as on a topic and a group (one grid for every page); the board draws Access\'s inside main with negative margins, and its main runs to the foot';
@@ -82,9 +82,8 @@ export const ALLOW: Allowed[] = [
   { board: 'Sc-Home', el: 'more button', prop: 'presence', board_value: "present", live_value: "absent", at: ['1440-dark', '1440-light'], reason: HOME_MORE },
   { board: 'Sc-Home', el: 'row', prop: 'bg', board_value: "rgb(233, 232, 226)", live_value: "rgba(0, 0, 0, 0)", at: ['1440-light'], reason: SAMPLE_SELECTED },
   { board: 'Sc-Home', el: 'pill in main', prop: 'presence', board_value: "present", live_value: "absent", at: ['1440-dark', '1440-light'], reason: REGISTRY_DOCK },
-  { board: 'Sc-Home', el: 'dock', prop: 'presence', board_value: "present", live_value: "absent", at: ['1440-dark', '1440-light'], reason: REGISTRY_DOCK },
-  { board: 'Sc-Home', el: 'dock head', prop: 'presence', board_value: "present", live_value: "absent", at: ['1440-dark', '1440-light'], reason: REGISTRY_DOCK },
-  { board: 'Sc-Home', el: 'dock row', prop: 'presence', board_value: "present", live_value: "absent", at: ['1440-dark', '1440-light'], reason: REGISTRY_DOCK },
+  { board: 'Sc-Home', el: 'dock', prop: 'margin', board_value: "0px -20px", live_value: "0px", at: ['1440-dark', '1440-light'], reason: REGISTRY_DOCK },
+  { board: 'Sc-Home', el: 'main', prop: 'h', board_value: "828", live_value: "687", at: ['1440-dark', '1440-light'], reason: REGISTRY_DOCK },
   { board: 'Sc-Home', el: 'row', prop: 'bg', board_value: "rgb(38, 42, 47)", live_value: "rgba(0, 0, 0, 0)", at: ['1440-dark'], reason: SAMPLE_SELECTED },
   { board: 'Tc-Home', el: 'table head', prop: 'y', board_value: "262.5", live_value: "277", at: ['1440-dark', '1440-light'], reason: TC_SHRINK },
   { board: 'Tc-Home', el: 'head cell', prop: 'y', board_value: "267", live_value: "281.5", at: ['1440-dark', '1440-light'], reason: TC_SHRINK },

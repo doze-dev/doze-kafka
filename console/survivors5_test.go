@@ -84,10 +84,11 @@ func TestACLInspectorCountsItsNeighboursWithTheRightSign(t *testing.T) {
 
 func TestVersionsTableCountsChangedLinesWithTheRightSign(t *testing.T) {
 	c, _, _ := newRegistryConsole(t)
-	register(t, c, "orders-value", userV1)
-	register(t, c, "orders-value", userV2)
+	// An enum has no fields to name, so what changed is counted in lines.
+	register(t, c, "orders-value", `{"type":"enum","name":"E","symbols":["A"]}`)
+	register(t, c, "orders-value", `{"type":"enum","name":"E","symbols":["A","B"]}`)
 	text := readable(req(t, c, "GET", "/_console/schemas/orders-value", nil).Body.String())
-	if !regexp.MustCompile(`(^|\s)8 lines changed from v1`).MatchString(text) {
+	if !regexp.MustCompile(`(^|\s)3 lines changed\s`).MatchString(text) {
 		t.Errorf("%s", between(text, "VersionIdWhat", "Schema v2"))
 	}
 }

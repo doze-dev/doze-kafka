@@ -286,7 +286,7 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 				vsay = html.UnescapeString(regexp.MustCompile(`hx-confirm="([^"]*)"`).FindStringSubmatch(m)[1])
 			}
 		}
-		if !strings.Contains(vsay, "Delete version 3") || !strings.Contains(vsay, "version 2 becomes the latest") || numberBefore(t, vsay, "stay") != 2 {
+		if !strings.Contains(vsay, "Soft delete version 3") || !strings.Contains(vsay, "Latest becomes v2.") {
 			t.Fatalf("version confirm: %q", vsay)
 		}
 		if rec := req(t, c, "POST", "/_console/schemas/evolving/delete", url.Values{"version": {"3"}}); rec.Code != 303 {
@@ -296,7 +296,7 @@ func TestEveryConfirmIsTrueOfWhatTheActionDoes(t *testing.T) {
 		if err != nil || len(versions) != 2 || versions[len(versions)-1] != 2 {
 			t.Errorf("versions after = %v (%v), want [1 2]", versions, err)
 		}
-		if rec := req(t, c, "POST", "/_console/schemas/evolving/delete", nil); rec.Code != 303 {
+		if rec := req(t, c, "POST", "/_console/schemas/evolving/delete", url.Values{"confirm": {"evolving"}}); rec.Code != 303 {
 			t.Fatalf("delete subject: %d", rec.Code)
 		}
 		if _, err := c.reg.Versions(ctx, "evolving"); err == nil {
@@ -407,10 +407,10 @@ func TestTheConfirmIsMeasuredWhenTheButtonIsPressed(t *testing.T) {
 	}
 	register(t, c, "fresh-value", userV1)
 	register(t, c, "fresh-value", userV2)
-	if r := req(t, c, "GET", "/_console/confirm/schema.version.delete?subject=fresh-value&version=2", nil); r.Code != 200 || !strings.Contains(r.Body.String(), "version 1 becomes the latest") {
+	if r := req(t, c, "GET", "/_console/confirm/schema.version.delete?subject=fresh-value&version=2", nil); r.Code != 200 || !strings.Contains(r.Body.String(), "Latest becomes v1.") {
 		t.Errorf("schema.version.delete: %d %s", r.Code, r.Body)
 	}
-	if r := req(t, c, "GET", "/_console/confirm/schema.delete?subject=fresh-value", nil); r.Code != 200 || !strings.Contains(r.Body.String(), "all 2 versions") {
+	if r := req(t, c, "GET", "/_console/confirm/schema.delete?subject=fresh-value", nil); r.Code != 200 || !strings.Contains(r.Body.String(), "All 2 versions") || !strings.Contains(r.Body.String(), "Ids 1 and 2 are never handed out again") {
 		t.Errorf("schema.delete: %d %s", r.Code, r.Body)
 	}
 }

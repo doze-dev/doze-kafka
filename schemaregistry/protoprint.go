@@ -132,6 +132,32 @@ func (p *protoPrinter) optionText(o *ast.OptionNode) string {
 	return p.raw(o.Name) + " = " + p.raw(o.Val)
 }
 
+// fieldOptions prints a field's options as Confluent does (recorded:
+// protobuf-descriptor-with-import): its own options in the order written, then default,
+// then json_name; one option inline, several one to a line.
+func (p *protoPrinter) fieldOptions(c *ast.CompactOptionsNode, indent int) string {
+	if c == nil || len(c.Options) == 0 {
+		return ""
+	}
+	var own, def, js []string
+	for _, o := range c.Options {
+		switch p.raw(o.Name) {
+		case "default":
+			def = append(def, p.optionText(o))
+		case "json_name":
+			js = append(js, p.optionText(o))
+		default:
+			own = append(own, p.optionText(o))
+		}
+	}
+	parts := append(append(own, def...), js...)
+	if len(parts) == 1 {
+		return " [" + parts[0] + "]"
+	}
+	in := strings.Repeat("  ", indent)
+	return " [\n" + in + "  " + strings.Join(parts, ",\n"+in+"  ") + "\n" + in + "]"
+}
+
 func (p *protoPrinter) compactOptions(c *ast.CompactOptionsNode) string {
 	if c == nil || len(c.Options) == 0 {
 		return ""
@@ -151,11 +177,11 @@ func (p *protoPrinter) label(l ast.FieldLabel) string {
 }
 
 func (p *protoPrinter) field(f *ast.FieldNode, indent int) {
-	p.line(indent, "%s%s %s = %s%s;", p.label(f.Label), p.raw(f.FldType), f.Name.Val, p.raw(f.Tag), p.compactOptions(f.Options))
+	p.line(indent, "%s%s %s = %s%s;", p.label(f.Label), p.raw(f.FldType), f.Name.Val, p.raw(f.Tag), p.fieldOptions(f.Options, indent))
 }
 
 func (p *protoPrinter) mapField(f *ast.MapFieldNode, indent int) {
-	p.line(indent, "map<%s, %s> %s = %s%s;", p.raw(f.MapType.KeyType), p.raw(f.MapType.ValueType), f.Name.Val, p.raw(f.Tag), p.compactOptions(f.Options))
+	p.line(indent, "map<%s, %s> %s = %s%s;", p.raw(f.MapType.KeyType), p.raw(f.MapType.ValueType), f.Name.Val, p.raw(f.Tag), p.fieldOptions(f.Options, indent))
 }
 
 func (p *protoPrinter) message(m *ast.MessageNode, indent int) {

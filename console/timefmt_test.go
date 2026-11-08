@@ -102,3 +102,23 @@ func TestARecordsTimeIsAnInstantNotTheServersLocalText(t *testing.T) {
 		t.Error("the inspector's timestamp is not the formatter's")
 	}
 }
+
+// The Schemas boards' "Registered": by the day it fell on.
+func TestDayText(t *testing.T) {
+	now := time.Date(2026, 11, 8, 14, 36, 0, 0, time.UTC)
+	for at, want := range map[time.Time]string{
+		time.Date(2026, 11, 8, 14, 2, 0, 0, time.UTC):  "14:02 today",
+		time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC):   "00:00 today",
+		time.Date(2026, 11, 7, 16, 48, 0, 0, time.UTC): "yesterday 16:48",
+		time.Date(2026, 11, 5, 23, 59, 0, 0, time.UTC): "3 days ago",
+		time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC):   "2026-11-01",
+		time.Date(2026, 11, 9, 1, 0, 0, 0, time.UTC):   "01:00 today", // a clock ahead is not "tomorrow"
+	} {
+		if got := dayText(at, now); got != want {
+			t.Errorf("%v: %q, want %q", at, got, want)
+		}
+	}
+	if got := whenText(time.Now().Add(-time.Minute), StyleDay); !strings.HasSuffix(got, " today UTC") && !strings.HasPrefix(got, "yesterday") {
+		t.Errorf("the server's own text: %q", got)
+	}
+}
